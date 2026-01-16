@@ -344,18 +344,22 @@ impl Route {
         self.params.data.get(&key).copied()
     }
 
+    /// Get a parameter value as a `String`.
     pub fn get_param_string(&self, key: LiveId) -> Option<String> {
         self.get_param(key)?.as_string(|id_str| id_str.map(|s| s.to_string()))
     }
 
+    /// Get a parameter value as `i64` (parsed).
     pub fn get_param_i64(&self, key: LiveId) -> Option<i64> {
         self.get_param_string(key)?.parse().ok()
     }
 
+    /// Get a parameter value as `u64` (parsed).
     pub fn get_param_u64(&self, key: LiveId) -> Option<u64> {
         self.get_param_string(key)?.parse().ok()
     }
 
+    /// Get a parameter value as `bool` (accepts 1/0, true/false, yes/no, on/off).
     pub fn get_param_bool(&self, key: LiveId) -> Option<bool> {
         match self.get_param_string(key)?.to_ascii_lowercase().as_str() {
             "1" | "true" | "yes" | "on" => Some(true),
@@ -364,30 +368,37 @@ impl Route {
         }
     }
 
+    /// Get a parameter value as `f64` (parsed).
     pub fn get_param_f64(&self, key: LiveId) -> Option<f64> {
         self.get_param_string(key)?.parse().ok()
     }
 
+    /// Build a query string from the stored query map.
     pub fn query_string(&self) -> String {
         url::build_query_string(&self.query.data)
     }
 
+    /// Get a query value by key.
     pub fn query_get(&self, key: &str) -> Option<&str> {
         self.query.get(key)
     }
 
+    /// Get a query value as a `String`.
     pub fn query_get_string(&self, key: &str) -> Option<String> {
         Some(self.query_get(key)?.to_string())
     }
 
+    /// Get a query value as `i64` (parsed).
     pub fn query_get_i64(&self, key: &str) -> Option<i64> {
         self.query_get(key)?.parse().ok()
     }
 
+    /// Get a query value as `u64` (parsed).
     pub fn query_get_u64(&self, key: &str) -> Option<u64> {
         self.query_get(key)?.parse().ok()
     }
 
+    /// Get a query value as `bool` (accepts 1/0, true/false, yes/no, on/off).
     pub fn query_get_bool(&self, key: &str) -> Option<bool> {
         match self.query_get(key)?.to_ascii_lowercase().as_str() {
             "1" | "true" | "yes" | "on" => Some(true),
@@ -396,6 +407,7 @@ impl Route {
         }
     }
 
+    /// Get a query value as `f64` (parsed).
     pub fn query_get_f64(&self, key: &str) -> Option<f64> {
         self.query_get(key)?.parse().ok()
     }
@@ -419,26 +431,32 @@ impl RouteParams {
 }
 
 impl RouteQuery {
+    /// Create an empty query map.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Get a query value by key.
     pub fn get(&self, key: &str) -> Option<&str> {
         self.data.get(key).map(|v| v.as_str())
     }
 
+    /// Set or replace a query key.
     pub fn set(&mut self, key: impl Into<String>, value: impl Into<String>) {
         self.data.insert(key.into(), value.into());
     }
 
+    /// Remove a query key, returning true if present.
     pub fn remove(&mut self, key: &str) -> bool {
         self.data.remove(key).is_some()
     }
 
+    /// Clear all query keys.
     pub fn clear(&mut self) {
         self.data.clear();
     }
 
+    /// Build a query map from a raw query string (`?a=1&b=2`).
     pub fn from_query_string(query: &str) -> Self {
         Self {
             data: url::parse_query_map(query),

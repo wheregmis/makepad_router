@@ -119,14 +119,17 @@ impl NavigationHistory {
         &self.stack
     }
 
+    /// Current index into the history stack.
     pub fn current_index(&self) -> usize {
         self.current_index
     }
 
+    /// Split history into stack + current index (for persistence).
     pub fn into_parts(self) -> (Vec<Route>, usize) {
         (self.stack, self.current_index)
     }
 
+    /// Restore history from stack + current index.
     pub fn from_parts(stack: Vec<Route>, current_index: usize) -> Self {
         if stack.is_empty() {
             return Self::empty();

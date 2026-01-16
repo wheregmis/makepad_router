@@ -4,6 +4,7 @@ use makepad_widgets::*;
 use super::{RouterNavRequest, RouterWidget, RouterActionKind, RouterTransitionDirection, RouterTransitionSpec};
 
 impl RouterWidget {
+    /// Navigate using a URL string (web-style). Returns true on success.
     pub fn navigate_by_url(&mut self, cx: &mut Cx, url: &str) -> bool {
         if !self.guard_bypass {
             return self.request_navigation(
@@ -22,6 +23,7 @@ impl RouterWidget {
         ok
     }
 
+    /// Navigate to a route by id. Returns true if the route exists.
     pub fn navigate(&mut self, cx: &mut Cx, route_id: LiveId) -> bool {
         if !self.guard_bypass {
             return self.request_navigation(cx, RouterNavRequest::Navigate { route_id });
@@ -60,6 +62,7 @@ impl RouterWidget {
         }
     }
 
+    /// Navigate with an explicit transition override.
     pub fn navigate_with_transition(
         &mut self,
         cx: &mut Cx,
@@ -109,6 +112,7 @@ impl RouterWidget {
         }
     }
 
+    /// Replace the current route by id (does not add to history).
     pub fn replace(&mut self, cx: &mut Cx, route_id: LiveId) -> bool {
         if !self.guard_bypass {
             return self.request_navigation(cx, RouterNavRequest::Replace { route_id });
@@ -147,6 +151,7 @@ impl RouterWidget {
         }
     }
 
+    /// Replace with an explicit transition override.
     pub fn replace_with_transition(
         &mut self,
         cx: &mut Cx,
@@ -196,6 +201,7 @@ impl RouterWidget {
         }
     }
 
+    /// Go back in history. Returns true if navigation occurred.
     pub fn back(&mut self, cx: &mut Cx) -> bool {
         if !self.guard_bypass {
             return self.request_navigation(cx, RouterNavRequest::Back { transition: None });
@@ -234,6 +240,7 @@ impl RouterWidget {
         }
     }
 
+    /// Go back in history with an explicit transition override.
     pub fn back_with_transition(&mut self, cx: &mut Cx, transition: RouterTransitionSpec) -> bool {
         if !self.guard_bypass {
             return self.request_navigation(
@@ -274,6 +281,7 @@ impl RouterWidget {
         }
     }
 
+    /// Go forward in history. Returns true if navigation occurred.
     pub fn forward(&mut self, cx: &mut Cx) -> bool {
         if !self.guard_bypass {
             return self.request_navigation(cx, RouterNavRequest::Forward { transition: None });
@@ -309,6 +317,7 @@ impl RouterWidget {
         }
     }
 
+    /// Go forward in history. Returns true if navigation occurred.
     pub fn forward_with_transition(
         &mut self,
         cx: &mut Cx,
@@ -353,36 +362,44 @@ impl RouterWidget {
         }
     }
 
+    /// Whether there is a previous route in history.
     pub fn can_go_back(&self) -> bool {
         self.router.can_go_back()
     }
 
+    /// Whether there is a forward route in history.
     pub fn can_go_forward(&self) -> bool {
         self.router.can_go_forward()
     }
 
+    /// History depth.
     pub fn depth(&self) -> usize {
         self.router.depth()
     }
 
+    /// Current route id, if any.
     pub fn current_route_id(&self) -> Option<LiveId> {
         self.router.current_route_id()
     }
 
+    /// Snapshot current router state (for persistence).
     pub fn get_state(&self) -> RouterState {
         self.build_state()
     }
 
+    /// Restore router state. Returns true on success.
     pub fn set_state(&mut self, cx: &mut Cx, state: RouterState) -> bool {
         self.apply_state(cx, state)
     }
 
+    /// Clear history, keeping the current route.
     pub fn clear_history(&mut self, cx: &mut Cx) {
         self.router.clear_history();
         self.web_replace_current_url(cx);
         self.redraw(cx);
     }
 
+    /// Reset history to a single route.
     pub fn reset(&mut self, cx: &mut Cx, route: Route) -> bool {
         if !self.guard_bypass {
             return self.request_navigation(cx, RouterNavRequest::Reset { route });
@@ -419,10 +436,12 @@ impl RouterWidget {
         true
     }
 
+    /// Push a route (alias of `navigate`).
     pub fn push(&mut self, cx: &mut Cx, route_id: LiveId) -> bool {
         self.navigate(cx, route_id)
     }
 
+    /// Pop the current route (stack-style semantics).
     pub fn pop(&mut self, cx: &mut Cx) -> bool {
         if !self.guard_bypass {
             return self.request_navigation(cx, RouterNavRequest::Pop);
@@ -451,6 +470,7 @@ impl RouterWidget {
         false
     }
 
+    /// Pop to a route id (stack-style semantics).
     pub fn pop_to(&mut self, cx: &mut Cx, route_id: LiveId) -> bool {
         if !self.guard_bypass {
             return self.request_navigation(cx, RouterNavRequest::PopTo { route_id });
@@ -484,6 +504,7 @@ impl RouterWidget {
         false
     }
 
+    /// Pop to the root route (stack-style semantics).
     pub fn pop_to_root(&mut self, cx: &mut Cx) -> bool {
         if !self.guard_bypass {
             return self.request_navigation(cx, RouterNavRequest::PopToRoot);
@@ -517,6 +538,7 @@ impl RouterWidget {
         false
     }
 
+    /// Set the entire stack (stack-style semantics).
     pub fn set_stack(&mut self, cx: &mut Cx, stack: Vec<Route>) -> bool {
         if !self.guard_bypass {
             return self.request_navigation(cx, RouterNavRequest::SetStack { stack });
@@ -555,7 +577,7 @@ impl RouterWidget {
         true
     }
 
-    /// Navigate by path string
+    /// Navigate by path string (matches registered route patterns).
     pub fn navigate_by_path(&mut self, cx: &mut Cx, path: &str) -> bool {
         if !self.guard_bypass {
             return self.request_navigation(

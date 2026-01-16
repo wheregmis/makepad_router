@@ -1,61 +1,40 @@
 # Makepad Router
 
-A standalone routing package for Makepad applications, providing navigation and page management capabilities.
+A standalone routing package for Makepad applications, providing navigation, deep links, and page management for both widget-based and headless use.
 
 ## Features
 
-- **LiveId-Based Routes**: Routes are identified using Makepad's `LiveId` system
-- **Navigation History**: Full browser-like back/forward navigation support
-- **Route Parameters**: Support for parameterized routes
-- **Query + Hash**: Optional query-string map and hash fragment stored per history entry
-- **State Persistence**: Optional state persistence using SerRon/DeRon
-- **Integration with Makepad Widgets**: Seamless integration with Makepad's widget system
-- **Declarative Route Definition**: Define routes directly in Makepad's DSL
+- **LiveId routes + DSL integration** (define routes directly in `live_design!`)
+- **Path patterns** with params and wildcards (`/user/:id`, `/admin/*`, `/docs/**`)
+- **Navigation history** with back/forward semantics
+- **Query + hash support** per history entry
+- **URL sync (web)** with `use_initial_url` for deep linking
+- **Nested routers** for sub-navigation
+- **Transitions** + optional hero (shared element) transitions
+- **Guards + before-leave hooks** (sync + async)
+- **State persistence** via SerRon/DeRon
+- **Debug inspector overlay** for dev diagnostics
 
-## Architecture
-
-The router package consists of several key components:
-
-### Core Components (`libs/router/src/`)
-
-1. **route.rs** - Route and RouteParams structures
-   - Define individual routes with optional parameters
-   - Macro support for easy route creation
-
-2. **navigation.rs** - NavigationHistory management
-   - Stack-based navigation history
-   - Back/forward navigation support
-   - History depth tracking
-
-3. **router.rs** - Router state management
-   - Centralized router logic
-   - Navigation actions (Navigate, Replace, Back, Forward)
-   - Route change notifications
-
-4. **widget.rs** - RouterWidget implementation
-   - Visual widget for rendering routes
-   - Event handling for active routes
-   - LiveHook integration for DSL support
-
-## Usage
-
-### Basic Example
+## Quick Start
 
 ```rust
 use makepad_widgets::*;
+use makepad_router::{RouterWidgetWidgetRefExt, RouterAction};
 
 live_design! {
     use makepad_router::widget::*;
-    
+
     App = {{App}} {
         ui: <Window> {
             router = <RouterWidget> {
                 width: Fill, height: Fill
                 default_route: home
-                
-                home = <HomePage> {}
-                settings = <SettingsPage> {}
-                profile = <ProfilePage> {}
+                not_found_route: not_found
+
+                home = <HomePage> { route_pattern: "/" }
+                settings = <SettingsPage> { route_pattern: "/settings/*" }
+                detail = <DetailPage> { route_pattern: "/detail/:id" }
+                not_found = <NotFoundPage> {}
             }
         }
     }
@@ -63,113 +42,92 @@ live_design! {
 
 impl MatchEvent for App {
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
-        if self.ui.button(id!(home_btn)).clicked(&actions) {
-            self.ui.router_widget(id!(router)).navigate(cx, live_id!(home));
+        let router = self.ui.router_widget(ids!(router));
+
+        if self.ui.button(ids!(home_btn)).clicked(actions) {
+            router.navigate(cx, live_id!(home));
         }
-        
-        if self.ui.button(id!(back_btn)).clicked(&actions) {
-            self.ui.router_widget(id!(router)).back(cx);
+
+        if self.ui.button(ids!(back_btn)).clicked(actions) {
+            router.back(cx);
+        }
+
+        for action in actions.filter_widget_actions(router.widget_uid()) {
+            if let Some(RouterAction::RouteChanged { from, to }) = action.action.downcast_ref() {
+                log!("Route changed: {:?} -> {:?}", from, to);
+            }
         }
     }
 }
 ```
 
-### Route with Parameters
+## Path Parameters + Query
 
 ```rust
 use makepad_router::prelude::*;
 
-// Create a route with parameters
-let profile_route = route!(profile, user_id = john_doe);
+// Navigate by path (matches registered patterns)
+router.navigate_by_path(cx, "/detail/42?tab=posts");
 
-// Navigate to the route
-router.navigate_with_route(cx, profile_route);
-
-// Access parameters
+// Read params/query from current route
 if let Some(route) = router.current_route() {
-    if let Some(user_id) = route.get_param(live_id!(user_id)) {
-        // Use the user_id parameter
+    if let Some(id) = route.get_param_string(live_id!(id)) {
+        log!("id={}", id);
     }
-}
-```
-
-### Query + State
-
-```rust
-use makepad_router::prelude::*;
-
-// Navigate with query string (works via navigate_by_path or navigate_by_url)
-router.navigate_by_path(cx, "/user/123?tab=posts");
-
-// Read query
-if let Some(route) = router.current_route() {
     if let Some(tab) = route.query_get("tab") {
-        // ...
+        log!("tab={}", tab);
     }
 }
-
-// Persist/restore history stack + current route
-let state = router.get_state();
-let ron = state.serialize_ron();
-let restored = RouterState::deserialize_ron(&ron).unwrap();
-router.set_state(cx, restored);
 ```
 
-### Navigation Methods
+## Guards + Before-Leave Hooks
 
 ```rust
-// Navigate to a new route (adds to history)
-router.navigate(cx, live_id!(settings));
+use makepad_router::{RouterGuardDecision, RouterRedirect, RouterRedirectTarget, RouterBeforeLeaveDecision};
 
-// Replace current route (doesn't add to history)
-router.replace(cx, live_id!(login));
+router.add_route_guard(|_cx, nav| {
+    if nav.to.as_ref().map(|r| r.id) == Some(live_id!(admin)) {
+        return RouterGuardDecision::Redirect(RouterRedirect {
+            target: RouterRedirectTarget::Route(live_id!(login)),
+            replace: true,
+        });
+    }
+    RouterGuardDecision::Allow
+});
 
-// Go back in history
-router.back(cx);
-
-// Go forward in history
-router.forward(cx);
-
-// Check navigation availability
-if router.can_go_back() {
-    // Show back button
-}
+router.add_before_leave_hook(|_cx, nav| {
+    if nav.from.as_ref().map(|r| r.id) == Some(live_id!(settings)) {
+        return RouterBeforeLeaveDecision::Block;
+    }
+    RouterBeforeLeaveDecision::Allow
+});
 ```
 
-## Design Philosophy
+## Example App
 
-The router is designed to be:
+Run the example app:
 
-1. **Standalone**: Can be used independently of other Makepad components
-2. **Declarative**: Routes defined in Makepad's DSL alongside UI
-3. **Type-safe**: Uses LiveId for compile-time route checking
-4. **Lightweight**: Minimal overhead, only active routes are rendered
-5. **Familiar**: Navigation patterns similar to web routers
+```
+cargo run -p router_example
+```
 
-## Comparison with Existing Patterns
+Routes in the example:
+- `/` (home)
+- `/settings/*` (nested router)
+- `/detail/:id` (param)
+- `not_found` (catch-all)
 
-### vs. PageFlip
-- **Router**: Full navigation history, route parameters, centralized routing
-- **PageFlip**: Simple page switcher, no history, manual state management
+## Architecture
 
-### vs. StackNavigation
-- **Router**: Any navigation pattern, declarative routes, LiveId-based
-- **StackNavigation**: Mobile push/pop only, imperative, animation-focused
+Key components in `src/`:
 
-### vs. Dock/Tabs
-- **Router**: Application-level routing, shareable routes
-- **Dock/Tabs**: IDE-style layout, local state only
-
-## Future Enhancements
-
-- URL synchronization for web targets
-- Route guards and middleware
-- Nested routers
-- Route transitions/animations
-- Query parameter support
-- Deep linking
-- Route aliases
-- Debug router inspector overlay (`debug_inspector: true`)
+1. **route.rs** – Route + pattern parsing, params, and query helpers
+2. **navigation.rs** – History stack and back/forward logic
+3. **router.rs** – Core router state + pattern registry
+4. **widget.rs** – RouterWidget implementation and DSL integration
+5. **guards.rs** – Guard/before-leave types
+6. **url.rs** – URL parsing + query helpers
+7. **state.rs** – Serializable router state
 
 ## License
 

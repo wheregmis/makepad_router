@@ -1,13 +1,18 @@
 use std::collections::HashMap;
 
+/// Parsed URL parts for router navigation.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct RouterUrl {
+    /// Normalized path (always starts with `/`).
     pub path: String,
+    /// Raw query string including the leading `?` (or empty).
     pub query: String,
+    /// Raw hash including the leading `#` (or empty).
     pub hash: String,
 }
 
 impl RouterUrl {
+    /// Parse a URL or path into normalized path/query/hash parts.
     pub fn parse(input: &str) -> Self {
         let mut s = input.trim().to_string();
         if s.is_empty() {
@@ -49,15 +54,18 @@ impl RouterUrl {
         Self { path, query, hash }
     }
 
+    /// Reconstruct a URL string from path/query/hash parts.
     pub fn to_string(&self) -> String {
         format!("{}{}{}", self.path, self.query, self.hash)
     }
 
+    /// Parse the query string into a string map.
     pub fn parse_query_map(&self) -> HashMap<String, String> {
         parse_query_map(&self.query)
     }
 }
 
+/// Parse a query string (`?a=1&b=2`) into a string map.
 pub fn parse_query_map(query: &str) -> HashMap<String, String> {
     let q = query.trim();
     let q = q.strip_prefix('?').unwrap_or(q);
@@ -83,6 +91,7 @@ pub fn parse_query_map(query: &str) -> HashMap<String, String> {
     out
 }
 
+/// Build a stable, sorted query string from a map.
 pub fn build_query_string(map: &HashMap<String, String>) -> String {
     if map.is_empty() {
         return String::new();

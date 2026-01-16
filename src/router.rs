@@ -30,6 +30,7 @@ pub struct RouteRegistry {
 }
 
 impl RouteRegistry {
+    /// Create an empty registry.
     pub fn new() -> Self {
         Self {
             by_id: HashMap::new(),
@@ -72,7 +73,7 @@ impl RouteRegistry {
         Ok(())
     }
 
-    /// Resolve a path to a route
+    /// Resolve a path to a route (exact static match first, then pattern match).
     pub fn resolve_path(&self, path: &str) -> Option<Route> {
         let normalized = Self::normalize_path(path);
 
@@ -132,7 +133,7 @@ impl RouteRegistry {
         self.by_id.contains_key(&route_id)
     }
 
-    /// Get pattern for a route ID
+    /// Get pattern for a route ID (if registered with a pattern).
     pub fn get_pattern(&self, route_id: LiveId) -> Option<&RoutePattern> {
         self.by_id.get(&route_id).and_then(|e| e.pattern.as_ref())
     }
@@ -398,6 +399,7 @@ impl Router {
     }
 
     /// Navigate using a path string, using the registered route patterns.
+    /// Returns the resolved `Route` on success.
     pub fn navigate_by_path(&mut self, path: &str) -> Result<Route, String> {
         let route = self
             .route_registry
