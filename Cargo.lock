@@ -808,6 +808,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "router_example"
+version = "0.1.0"
+dependencies = [
+ "makepad-router",
+ "makepad-widgets",
+]
+
+[[package]]
 name = "roxmltree"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

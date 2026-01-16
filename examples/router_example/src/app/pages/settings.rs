@@ -1,54 +1,149 @@
-use makepad_router::RouterWidgetRef;
+use makepad_router::{RouterWidgetRef, RouterWidgetWidgetRefExt};
 use makepad_widgets::*;
-
-use crate::app::shared::SharedState;
 
 live_design! {
     use link::widgets::*;
     use link::theme_desktop_dark::*;
+    use makepad_router::widget::*;
+    use makepad_draw::shader::std::*;
+
+    TabButton = <Button> {
+        width: Fit, height: 32
+        padding: { left: 12, right: 12, top: 4, bottom: 4 }
+        draw_bg: {
+            color: #FFFFFF
+            color_hover: #F2F6FB
+            color_down: #E6EEF6
+            color_focus: #FFFFFF
+            border_radius: 14.0
+            border_size: 1.0
+            border_color: #D6E0EB
+            border_color_focus: #D6E0EB
+        }
+        draw_text: {
+            color: #1C2A3A
+            color_hover: #1C2A3A
+            color_down: #121A25
+            color_focus: #1C2A3A
+            text_style: { font_size: 12 }
+        }
+    }
+
+    GhostButton = <Button> {
+        width: Fit, height: 34
+        padding: { left: 14, right: 14, top: 6, bottom: 6 }
+        draw_bg: {
+            color: #FFFFFF
+            color_hover: #F2F6FB
+            color_down: #E6EEF6
+            color_focus: #FFFFFF
+            border_radius: 16.0
+            border_size: 1.0
+            border_color: #D6E0EB
+            border_color_focus: #D6E0EB
+        }
+        draw_text: {
+            color: #1C2A3A
+            color_hover: #1C2A3A
+            color_down: #121A25
+            color_focus: #1C2A3A
+            text_style: { font_size: 12 }
+        }
+    }
+
+    SettingsCard = <View> {
+        width: Fill, height: Fit
+        padding: 24
+        show_bg: true
+        draw_bg: {
+            color: #FFFFFF
+            fn pixel(self) -> vec4 {
+                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+                sdf.box(0., 0., self.rect_size.x, self.rect_size.y, 18.0);
+                sdf.fill(self.color);
+                sdf.stroke(#E2E8F0, 1.0);
+                return sdf.result;
+            }
+        }
+        flow: Down, spacing: 12
+    }
+
+    SettingsOverviewPage = <View> {
+        width: Fill, height: Fill
+        padding: 16
+        show_bg: true
+        draw_bg: {
+            color: #F7FAFD
+            fn pixel(self) -> vec4 {
+                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+                sdf.box(0., 0., self.rect_size.x, self.rect_size.y, 12.0);
+                sdf.fill(self.color);
+                sdf.stroke(#E2E8F0, 1.0);
+                return sdf.result;
+            }
+        }
+        flow: Down, spacing: 8
+
+        <Label> { text: "Overview" draw_text: { text_style: { font_size: 18 }, color: #1A2233 } }
+        <Label> { text: "Nested route: /settings/overview" draw_text: { text_style: { font_size: 12 }, color: #5A6A7D } }
+    }
+
+    SettingsProfilePage = <View> {
+        width: Fill, height: Fill
+        padding: 16
+        show_bg: true
+        draw_bg: {
+            color: #F7FAFD
+            fn pixel(self) -> vec4 {
+                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+                sdf.box(0., 0., self.rect_size.x, self.rect_size.y, 12.0);
+                sdf.fill(self.color);
+                sdf.stroke(#E2E8F0, 1.0);
+                return sdf.result;
+            }
+        }
+        flow: Down, spacing: 8
+
+        <Label> { text: "Profile" draw_text: { text_style: { font_size: 18 }, color: #1A2233 } }
+        <Label> { text: "Nested route: /settings/profile" draw_text: { text_style: { font_size: 12 }, color: #5A6A7D } }
+    }
 
     pub SettingsPage = <View> {
         width: Fill, height: Fill
-        show_bg: true
-        draw_bg: { color: #x0F3460 }
-
         flow: Down, spacing: 20, padding: 40
 
-        <Label> {
-            text: "Settings"
-            draw_text: { text_style: { font_size: 32 }, color: #xFFFFFF }
-        }
+        <SettingsCard> {
+            <Label> {
+                text: "Settings"
+                draw_text: { text_style: { font_size: 30 }, color: #1A2233 }
+            }
 
-        <Label> {
-            text: "This page toggles auth + dirty state to exercise guards and before-leave hooks."
-            draw_text: { text_style: { font_size: 14 }, color: #xAAAAAA }
-        }
+            <Label> {
+                text: "This route owns a nested RouterWidget."
+                draw_text: { text_style: { font_size: 13 }, color: #5A6A7D }
+            }
 
-        auth_status_label = <Label> {
-            text: "Auth: (unknown)"
-            draw_text: { text_style: { font_size: 16 }, color: #xFFFFFF }
-        }
+            <View> {
+                width: Fill, height: Fit
+                flow: Right, spacing: 10
+                overview_btn = <TabButton> { text: "Overview" }
+                profile_btn = <TabButton> { text: "Profile" }
+            }
 
-        dirty_status_label = <Label> {
-            text: "Dirty: (unknown)"
-            draw_text: { text_style: { font_size: 16 }, color: #xFFFFFF }
-        }
+            settings_router = <RouterWidget> {
+                width: Fill, height: 220
+                default_route: settings_overview
+                not_found_route: settings_overview
+                push_transition: SlideLeft
+                pop_transition: SlideRight
+                transition_duration: 0.20
 
-        <View> {
-            width: Fill, height: Fit
-            flow: Right, spacing: 10
-            login_toggle_btn = <Button> { text: "Toggle Login" }
-            dirty_toggle_btn = <Button> { text: "Toggle Dirty" }
-        }
+                settings_overview = <SettingsOverviewPage> { route_pattern: "/overview" }
+                settings_profile = <SettingsProfilePage> { route_pattern: "/profile" }
+            }
 
-        <View> {
-            width: Fill, height: Fit
-            flow: Right, spacing: 10
-            go_admin_btn = <Button> { text: "Go to /admin/dashboard (guarded)" }
-            go_stack_demo_btn = <Button> { text: "Open stack demo" }
+            home_btn = <GhostButton> { text: "Back to Home" }
         }
-
-        home_btn = <Button> { text: "Back to Home" }
     }
 }
 
@@ -56,62 +151,31 @@ live_design! {
 pub struct SettingsController;
 
 impl SettingsController {
-    pub fn handle_actions(
-        &mut self,
-        cx: &mut Cx,
-        actions: &Actions,
-        router: &RouterWidgetRef,
-        shared: &SharedState,
-    ) {
-        let Some((to_home, toggle_login, toggle_dirty, to_admin, to_stack)) =
+    pub fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions, router: &RouterWidgetRef) {
+        let Some((to_home, to_overview, to_profile, settings_router)) =
             router.with_active_route_widget(|w| {
                 (
                     w.button(&[live_id!(home_btn)]).clicked(actions),
-                    w.button(&[live_id!(login_toggle_btn)]).clicked(actions),
-                    w.button(&[live_id!(dirty_toggle_btn)]).clicked(actions),
-                    w.button(&[live_id!(go_admin_btn)]).clicked(actions),
-                    w.button(&[live_id!(go_stack_demo_btn)]).clicked(actions),
+                    w.button(&[live_id!(overview_btn)]).clicked(actions),
+                    w.button(&[live_id!(profile_btn)]).clicked(actions),
+                    w.widget(&[live_id!(settings_router)]).as_router_widget(),
                 )
             })
         else {
             return;
         };
 
-        if toggle_login {
-            shared.set_logged_in(!shared.is_logged_in());
-        }
-        if toggle_dirty {
-            shared.set_dirty(!shared.is_dirty());
+        if !settings_router.is_empty() {
+            if to_overview {
+                settings_router.navigate_by_path(cx, "/overview");
+            }
+            if to_profile {
+                settings_router.navigate_by_path(cx, "/profile");
+            }
         }
 
-        router.with_active_route_widget(|w| {
-            w.label(&[live_id!(auth_status_label)]).set_text(
-                cx,
-                if shared.is_logged_in() {
-                    "Auth: logged in"
-                } else {
-                    "Auth: logged out (admin is guarded)"
-                },
-            );
-            w.label(&[live_id!(dirty_status_label)]).set_text(
-                cx,
-                if shared.is_dirty() {
-                    "Dirty: true (before-leave blocks leaving Settings)"
-                } else {
-                    "Dirty: false"
-                },
-            );
-        });
-
-        if to_admin {
-            router.navigate_by_path(cx, "/admin/dashboard");
-        }
-        if to_stack {
-            router.navigate(cx, live_id!(stack_demo));
-        }
         if to_home {
             router.navigate(cx, live_id!(home));
         }
     }
 }
-

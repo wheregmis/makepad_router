@@ -5,6 +5,4 @@ edition = "2021"
 
 [dependencies]
 makepad-widgets = { git = "https://github.com/wheregmis/makepad.git", branch = "makepad_router" }
-makepad-router = { path = "../" }
-
-[features]
+makepad-router = { path = "../.." }
