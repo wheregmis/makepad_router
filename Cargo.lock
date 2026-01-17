@@ -487,6 +487,7 @@ dependencies = [
  "makepad-live-id",
  "makepad-micro-serde",
  "makepad-router-core",
+ "makepad-router-widgets",
  "makepad-widgets",
 ]
 
@@ -496,6 +497,17 @@ version = "1.0.0"
 dependencies = [
  "makepad-live-id",
  "makepad-micro-serde",
+]
+
+[[package]]
+name = "makepad-router-widgets"
+version = "1.0.0"
+dependencies = [
+ "makepad-draw",
+ "makepad-live-id",
+ "makepad-micro-serde",
+ "makepad-router-core",
+ "makepad-widgets",
 ]
 
 [[package]]
