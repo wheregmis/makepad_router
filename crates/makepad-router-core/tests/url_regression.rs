@@ -1,4 +1,4 @@
-use makepad_router::url::{build_query_string, parse_query_map, RouterUrl};
+use makepad_router_core::url::{build_query_string, parse_query_map, RouterUrl};
 use std::collections::HashMap;
 
 #[test]
