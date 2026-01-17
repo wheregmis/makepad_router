@@ -28,7 +28,7 @@ impl RouterWidget {
         if !self.guard_bypass {
             return self.request_navigation(cx, RouterNavRequest::Navigate { route_id });
         }
-        if self.route_templates.contains_key(&route_id) {
+        if self.routes.templates.contains_key(&route_id) {
             self.clear_url_extras();
             let old_route = self.router.current_route().cloned();
             self.router.navigate_to(route_id);
@@ -78,7 +78,7 @@ impl RouterWidget {
                 },
             );
         }
-        if self.route_templates.contains_key(&route_id) {
+        if self.routes.templates.contains_key(&route_id) {
             self.clear_url_extras();
             let old_route = self.router.current_route().cloned();
             self.router.navigate_to(route_id);
@@ -117,7 +117,7 @@ impl RouterWidget {
         if !self.guard_bypass {
             return self.request_navigation(cx, RouterNavRequest::Replace { route_id });
         }
-        if self.route_templates.contains_key(&route_id) {
+        if self.routes.templates.contains_key(&route_id) {
             self.clear_url_extras();
             let old_route = self.router.current_route().cloned();
             self.router.replace_with(route_id);
@@ -167,7 +167,7 @@ impl RouterWidget {
                 },
             );
         }
-        if self.route_templates.contains_key(&route_id) {
+        if self.routes.templates.contains_key(&route_id) {
             self.clear_url_extras();
             let old_route = self.router.current_route().cloned();
             self.router.replace_with(route_id);
@@ -404,7 +404,7 @@ impl RouterWidget {
         if !self.guard_bypass {
             return self.request_navigation(cx, RouterNavRequest::Reset { route });
         }
-        if !self.route_templates.contains_key(&route.id) {
+        if !self.routes.templates.contains_key(&route.id) {
             log!("Router: Route template not found for {:?}", route.id);
             return false;
         }
@@ -545,7 +545,7 @@ impl RouterWidget {
         }
         let filtered: Vec<Route> = stack
             .into_iter()
-            .filter(|r| self.route_templates.contains_key(&r.id))
+            .filter(|r| self.routes.templates.contains_key(&r.id))
             .collect();
         if filtered.is_empty() {
             return false;

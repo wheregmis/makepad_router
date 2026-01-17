@@ -1,5 +1,7 @@
 use makepad_widgets::*;
 
+// Web URL synchronization for RouterWidget (wasm32 only).
+
 use super::{RouterNavRequest, RouterWidget};
 
 impl RouterWidget {

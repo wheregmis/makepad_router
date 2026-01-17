@@ -1,3 +1,5 @@
+//! Public guard API plumbing for RouterWidget.
+
 use crate::guards::{
     RouterAsyncDecision, RouterAsyncGuard, RouterBeforeLeaveAsync, RouterBeforeLeaveDecision,
     RouterBeforeLeaveSync, RouterGuardDecision, RouterNavContext, RouterSyncGuard,
@@ -65,4 +67,3 @@ impl RouterWidget {
         &self.guards.route_guards_async
     }
 }
-

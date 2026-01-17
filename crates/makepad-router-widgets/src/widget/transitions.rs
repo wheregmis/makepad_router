@@ -1,6 +1,8 @@
 use makepad_draw::draw_list_2d::DrawListExt;
 use makepad_widgets::*;
 
+// Route transition presets and runtime state.
+
 use super::{hero::HeroTransitionState, RouterWidget};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -95,10 +97,11 @@ pub(super) struct TransitionEffect {
 
 impl RouterWidget {
     fn route_transition_spec(&self, route_id: LiveId) -> Option<RouterTransitionSpec> {
-        let preset_id = self.route_transition_overrides.get(&route_id).copied()?;
+        let preset_id = self.routes.transition_overrides.get(&route_id).copied()?;
         let preset = RouterTransitionPreset::from_live_id(preset_id);
         let duration = self
-            .route_transition_duration_overrides
+            .routes
+            .transition_duration_overrides
             .get(&route_id)
             .copied()
             .unwrap_or(self.transition_duration);

@@ -1,6 +1,8 @@
 use crate::{route::Route, state::RouterState};
 use makepad_widgets::{Cx, WidgetNode};
 
+// Router state persistence helpers.
+
 use super::{RouterAction, RouterWidget};
 
 impl RouterWidget {
@@ -18,7 +20,7 @@ impl RouterWidget {
         let mut filtered = Vec::<Route>::new();
         let mut new_current = 0usize;
         for (idx, route) in stack.into_iter().enumerate() {
-            if !self.route_templates.contains_key(&route.id) {
+            if !self.routes.templates.contains_key(&route.id) {
                 continue;
             }
             if idx <= current_index {

@@ -43,6 +43,16 @@ pub(crate) struct RouterCaches {
 }
 
 #[derive(Default)]
+pub(crate) struct RouterRouteMaps {
+    pub(crate) templates: ComponentMap<LiveId, LivePtr>,
+    pub(crate) widgets: ComponentMap<LiveId, WidgetRef>,
+    pub(crate) patterns: ComponentMap<LiveId, String>,
+    pub(crate) transition_overrides: ComponentMap<LiveId, LiveId>,
+    pub(crate) transition_duration_overrides: ComponentMap<LiveId, f64>,
+    pub(crate) child_router_paths: ComponentMap<LiveId, Vec<Vec<LiveId>>>,
+}
+
+#[derive(Default)]
 pub(crate) struct PointerCleanup {
     pub(crate) route: Option<LiveId>,
     pub(crate) budget: u8,

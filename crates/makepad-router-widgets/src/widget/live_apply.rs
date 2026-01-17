@@ -18,11 +18,11 @@ impl LiveHook for RouterWidget {
             self.caches.nested_prefix_cache_path.clear();
             self.caches.nested_prefix_cache_result = None;
             self.caches.url_parse_cache.clear();
-            self.route_templates.clear();
-            self.route_patterns.clear();
-            self.route_transition_overrides.clear();
-            self.route_transition_duration_overrides.clear();
-            self.child_router_paths.clear();
+            self.routes.templates.clear();
+            self.routes.patterns.clear();
+            self.routes.transition_overrides.clear();
+            self.routes.transition_duration_overrides.clear();
+            self.routes.child_router_paths.clear();
             self.child_routers.clear();
             self.router.route_registry = RouteRegistry::default();
             self.transition_rt.state = None;
@@ -72,7 +72,7 @@ impl LiveHook for RouterWidget {
                         .live_registry
                         .borrow()
                         .file_id_index_to_live_ptr(file_id, index);
-                    self.route_templates.insert(id, live_ptr);
+                    self.routes.templates.insert(id, live_ptr);
 
                     // Scan for route_pattern property in child nodes and register it.
                     if let Some(pattern_node_idx) = nodes.child_by_name(
@@ -82,7 +82,7 @@ impl LiveHook for RouterWidget {
                         let pattern_node = &nodes[pattern_node_idx];
                         if let LiveValue::Str(pattern) = &pattern_node.value {
                             let pattern_str = pattern.to_string();
-                            self.route_patterns.insert(id, pattern_str.clone());
+                            self.routes.patterns.insert(id, pattern_str.clone());
                             if let Err(e) = self.router.register_route_pattern(&pattern_str, id) {
                                 log!("Failed to register route pattern {}: {}", pattern_str, e);
                             } else {
@@ -91,7 +91,7 @@ impl LiveHook for RouterWidget {
                             }
                         } else if let LiveValue::String(pattern) = &pattern_node.value {
                             let pattern_str = pattern.as_str().to_string();
-                            self.route_patterns.insert(id, pattern_str.clone());
+                            self.routes.patterns.insert(id, pattern_str.clone());
                             if let Err(e) = self.router.register_route_pattern(&pattern_str, id) {
                                 log!("Failed to register route pattern {}: {}", pattern_str, e);
                             } else {
@@ -114,7 +114,7 @@ impl LiveHook for RouterWidget {
                             _ => LiveId(0),
                         };
                         if transition_id.0 != 0 {
-                            self.route_transition_overrides.insert(id, transition_id);
+                            self.routes.transition_overrides.insert(id, transition_id);
                         }
                     }
 
@@ -130,18 +130,18 @@ impl LiveHook for RouterWidget {
                             _ => None,
                         };
                         if let Some(duration) = duration {
-                            self.route_transition_duration_overrides.insert(id, duration);
+                            self.routes.transition_duration_overrides.insert(id, duration);
                         }
                     }
 
                     // Scan for nested RouterWidget instances inside this route.
-                    self.child_router_paths
+                    self.routes.child_router_paths
                         .insert(id, Self::collect_child_router_paths(index, nodes));
                     self.caches.route_registry_epoch = self.caches.route_registry_epoch.wrapping_add(1);
 
                     // Create/update the route widget instance only if it already exists
                     // (e.g. after navigation / hot reload). Otherwise it will be lazily created.
-                    if self.route_widgets.contains_key(&id) {
+                    if self.routes.widgets.contains_key(&id) {
                         let route_pattern_idx = nodes.child_by_name(
                             index,
                             LiveProp(live_id!(route_pattern), LivePropType::Field),
@@ -156,7 +156,8 @@ impl LiveHook for RouterWidget {
                         );
 
                         let widget = self
-                            .route_widgets
+                            .routes
+                            .widgets
                             .get_or_insert(cx, id, |_cx| WidgetRef::empty());
 
                         Self::apply_widget_silencing_route_metadata(

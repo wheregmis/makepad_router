@@ -37,13 +37,13 @@ impl RouterWidget {
     }
 
     pub(super) fn ensure_route_widget(&mut self, cx: &mut Cx, route_id: LiveId) {
-        if self.route_widgets.contains_key(&route_id) {
+        if self.routes.widgets.contains_key(&route_id) {
             return;
         }
-        let Some(ptr) = self.route_templates.get(&route_id).copied() else {
+        let Some(ptr) = self.routes.templates.get(&route_id).copied() else {
             return;
         };
-        self.route_widgets
+        self.routes.widgets
             .get_or_insert(cx, route_id, |cx| Self::new_route_widget_from_ptr(cx, ptr));
     }
 

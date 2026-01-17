@@ -1,3 +1,5 @@
+//! Router widget implementation and subsystem wiring.
+
 use crate::{
     guards::{
         RouterAsyncDecision, RouterBeforeLeaveDecision, RouterGuardDecision, RouterNavContext,
@@ -31,8 +33,8 @@ mod url_sync;
 
 use guard_flow::PendingNavigation;
 use fields::{
-    PointerCleanup, RouterCaches, RouterCallbacks, RouterDrawLists, RouterGuards, TransitionRuntime,
-    WebUrlState,
+    PointerCleanup, RouterCaches, RouterCallbacks, RouterDrawLists, RouterGuards, RouterRouteMaps,
+    TransitionRuntime, WebUrlState,
 };
 use transitions::{RouterActionKind, RouterTransitionDirection, RouterTransitionState};
 pub use transitions::{RouterTransitionPreset, RouterTransitionSpec};
@@ -177,19 +179,9 @@ pub struct RouterWidget {
     #[rust]
     router: Router,
     #[rust]
-    route_templates: ComponentMap<LiveId, LivePtr>,
-    #[rust]
-    route_widgets: ComponentMap<LiveId, WidgetRef>,
-    #[rust]
     child_routers: ComponentMap<LiveId, RouterWidgetRef>,
     #[rust]
-    route_patterns: ComponentMap<LiveId, String>,
-    #[rust]
-    route_transition_overrides: ComponentMap<LiveId, LiveId>,
-    #[rust]
-    route_transition_duration_overrides: ComponentMap<LiveId, f64>,
-    #[rust]
-    child_router_paths: ComponentMap<LiveId, Vec<Vec<LiveId>>>,
+    routes: RouterRouteMaps,
     #[rust]
     callbacks: RouterCallbacks,
     #[rust]
@@ -234,7 +226,7 @@ impl RouterWidget {
         route_id: LiveId,
     ) -> Result<(), String> {
         self.router.register_route_pattern(pattern, route_id)?;
-        self.route_patterns.insert(route_id, pattern.to_string());
+        self.routes.patterns.insert(route_id, pattern.to_string());
         self.caches.route_registry_epoch = self.caches.route_registry_epoch.wrapping_add(1);
         self.caches.nested_prefix_cache_epoch = 0;
         self.caches.nested_prefix_cache_path.clear();
@@ -267,7 +259,7 @@ impl WidgetNode for RouterWidget {
 
         // Fast-path: active route widget.
         if path[0] == self.active_route {
-            if let Some(widget) = self.route_widgets.get(&self.active_route) {
+            if let Some(widget) = self.routes.widgets.get(&self.active_route) {
                 if path.len() == 1 {
                     results.push(widget.clone());
                 } else {
@@ -278,7 +270,7 @@ impl WidgetNode for RouterWidget {
         }
 
         // Check route widgets
-        for (route_id, widget) in self.route_widgets.iter() {
+        for (route_id, widget) in self.routes.widgets.iter() {
             if path[0] == *route_id {
                 if path.len() == 1 {
                     results.push(widget.clone());
@@ -300,14 +292,14 @@ impl WidgetNode for RouterWidget {
         }
 
         // Fallback: search all widgets
-        for widget in self.route_widgets.values() {
+        for widget in self.routes.widgets.values() {
             widget.find_widgets(path, cached, results);
         }
     }
 
     fn uid_to_widget(&self, uid: WidgetUid) -> WidgetRef {
         // Fast-path: active route widget.
-        if let Some(active) = self.route_widgets.get(&self.active_route) {
+        if let Some(active) = self.routes.widgets.get(&self.active_route) {
             let result = active.uid_to_widget(uid);
             if !result.is_empty() {
                 return result;
@@ -315,7 +307,7 @@ impl WidgetNode for RouterWidget {
         }
 
         // Check route widgets
-        for (route_id, widget) in self.route_widgets.iter() {
+        for (route_id, widget) in self.routes.widgets.iter() {
             if *route_id == self.active_route {
                 continue;
             }
@@ -364,7 +356,7 @@ impl Widget for RouterWidget {
         let uid = self.widget_uid();
 
         // Handle active route first for better locality.
-        if let Some(active) = self.route_widgets.get_mut(&self.active_route) {
+        if let Some(active) = self.routes.widgets.get_mut(&self.active_route) {
             let active_uid = active.widget_uid();
             cx.group_widget_actions(uid, active_uid, |cx| active.handle_event(cx, event, scope));
         }
@@ -374,7 +366,7 @@ impl Widget for RouterWidget {
         if self.pointer_cleanup.budget > 0 {
             if let Some(route_id) = self.pointer_cleanup.route {
                 if route_id != self.active_route {
-                    if let Some(prev) = self.route_widgets.get_mut(&route_id) {
+                    if let Some(prev) = self.routes.widgets.get_mut(&route_id) {
                         prev.handle_event(cx, event, scope);
                     }
                 }
@@ -421,7 +413,7 @@ impl RouterWidgetRef {
     pub fn with_active_route_widget<R>(&self, f: impl FnOnce(&WidgetRef) -> R) -> Option<R> {
         let inner = self.borrow()?;
         let active_route = inner.active_route;
-        let route_widget = inner.route_widgets.get(&active_route)?;
+        let route_widget = inner.routes.widgets.get(&active_route)?;
         Some(f(route_widget))
     }
 

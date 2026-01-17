@@ -1,3 +1,5 @@
+//! Guard evaluation pipeline for navigation requests.
+
 use crate::{
     guards::{
         RouterAsyncDecision, RouterBeforeLeaveDecision, RouterGuardDecision, RouterNavContext,
@@ -82,7 +84,7 @@ impl RouterWidget {
             | RouterNavRequest::NavigateWithTransition { route_id, .. }
             | RouterNavRequest::Replace { route_id }
             | RouterNavRequest::ReplaceWithTransition { route_id, .. } => {
-                if !self.route_templates.contains_key(route_id) {
+                if !self.routes.templates.contains_key(route_id) {
                     return None;
                 }
                 to = Some(Route::new(*route_id));
@@ -96,7 +98,7 @@ impl RouterWidget {
                 to_path = Some(path.clone());
 
                 if let Some(mut route) = self.router.route_registry.resolve_path(&path) {
-                    if self.route_templates.contains_key(&route.id) {
+                    if self.routes.templates.contains_key(&route.id) {
                         route.query = query.clone();
                         route.hash = hash.clone();
                         to = Some(route);
@@ -105,7 +107,7 @@ impl RouterWidget {
                     }
                 } else if let Some((route_id, params, pattern, _tail)) = self.resolve_nested_prefix(&path)
                 {
-                    if self.route_templates.contains_key(&route_id) {
+                    if self.routes.templates.contains_key(&route_id) {
                         to = Some(Route {
                             id: route_id,
                             params,
@@ -117,7 +119,7 @@ impl RouterWidget {
                         return None;
                     }
                 } else if self.not_found_route.0 != 0
-                    && self.route_templates.contains_key(&self.not_found_route)
+                    && self.routes.templates.contains_key(&self.not_found_route)
                 {
                     match request {
                         RouterNavRequest::NavigateByPath { .. } => {
@@ -186,7 +188,7 @@ impl RouterWidget {
                 to = preview.current_route().cloned();
             }
             RouterNavRequest::Reset { route } => {
-                if !self.route_templates.contains_key(&route.id) {
+                if !self.routes.templates.contains_key(&route.id) {
                     return None;
                 }
                 to = Some(route.clone());
@@ -194,7 +196,7 @@ impl RouterWidget {
             RouterNavRequest::SetStack { stack } => {
                 let filtered: Vec<Route> = stack
                     .iter()
-                    .filter(|r| self.route_templates.contains_key(&r.id))
+                    .filter(|r| self.routes.templates.contains_key(&r.id))
                     .cloned()
                     .collect();
                 if filtered.is_empty() {
