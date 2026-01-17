@@ -1,3 +1,5 @@
+#![allow(clippy::question_mark)]
+
 use makepad_live_id::*;
 use makepad_micro_serde::*;
 use crate::pattern::{RouteParams, RoutePattern};
@@ -5,6 +7,7 @@ use crate::url;
 use std::collections::HashMap;
 
 /// Represents a route in the application
+#[allow(clippy::question_mark)]
 #[derive(Clone, Debug, PartialEq, Eq, SerBin, DeBin, SerRon, DeRon)]
 pub struct Route {
     /// The unique identifier for this route
@@ -20,6 +23,7 @@ pub struct Route {
 }
 
 /// Query parameters stored as a string map.
+#[allow(clippy::question_mark)]
 #[derive(Clone, Debug, Default, PartialEq, Eq, SerBin, DeBin, SerRon, DeRon)]
 pub struct RouteQuery {
     /// Query parameters stored as key-value string pairs.

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt;
 
 /// Parsed URL parts for router navigation.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -54,14 +55,15 @@ impl RouterUrl {
         Self { path, query, hash }
     }
 
-    /// Reconstruct a URL string from path/query/hash parts.
-    pub fn to_string(&self) -> String {
-        format!("{}{}{}", self.path, self.query, self.hash)
-    }
-
     /// Parse the query string into a string map.
     pub fn parse_query_map(&self) -> HashMap<String, String> {
         parse_query_map(&self.query)
+    }
+}
+
+impl fmt::Display for RouterUrl {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}{}{}", self.path, self.query, self.hash)
     }
 }
 

@@ -1,3 +1,4 @@
+#![allow(clippy::question_mark)]
 //! Route registry for pattern-based route management.
 //!
 //! This module provides the route registry that handles:
@@ -13,6 +14,7 @@ use makepad_micro_serde::*;
 use std::collections::HashMap;
 
 /// Route registry entry
+#[allow(clippy::question_mark)]
 #[derive(Clone, Debug, SerBin, DeBin, SerRon, DeRon)]
 struct RouteEntry {
     route_id: LiveId,

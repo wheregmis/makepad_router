@@ -160,9 +160,7 @@ impl RouterWidget {
                     _ => return None,
                 };
 
-                let Some((mut ctx, leaving)) = self.resolve_nav_context(cx, &inner_request) else {
-                    return None;
-                };
+                let (mut ctx, leaving) = self.resolve_nav_context(cx, &inner_request)?;
 
                 if let Some(to_route) = ctx.to.as_mut() {
                     to_route.query = query;
@@ -196,8 +194,8 @@ impl RouterWidget {
             RouterNavRequest::SetStack { stack } => {
                 let filtered: Vec<Route> = stack
                     .iter()
-                    .cloned()
                     .filter(|r| self.route_templates.contains_key(&r.id))
+                    .cloned()
                     .collect();
                 if filtered.is_empty() {
                     return None;

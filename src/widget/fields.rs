@@ -5,9 +5,11 @@ use super::RouterTransitionState;
 use crate::route::Route;
 use crate::guards::{RouterAsyncGuard, RouterBeforeLeaveAsync, RouterBeforeLeaveSync, RouterSyncGuard};
 
+type RouteChangeCallback = Box<dyn Fn(&mut Cx, Option<Route>, Route) + Send + Sync>;
+
 #[derive(Default)]
 pub(crate) struct RouterCallbacks {
-    pub(crate) route_change: Vec<Box<dyn Fn(&mut Cx, Option<Route>, Route) + Send + Sync>>,
+    pub(crate) route_change: Vec<RouteChangeCallback>,
 }
 
 #[derive(Default)]
