@@ -1,6 +1,8 @@
-use makepad_router::{NavigationHistory, Route, RouteParams, RoutePattern, RouteQuery, RouterState};
-use makepad_router::makepad_live_id::*;
-use makepad_router::makepad_micro_serde::{DeRon, SerRon};
+use makepad_router_core::makepad_live_id::*;
+use makepad_router_core::makepad_micro_serde::{DeRon, SerRon};
+use makepad_router_core::{
+    NavigationHistory, Route, RouteParams, RoutePattern, RouteQuery, RouterState,
+};
 
 #[test]
 fn router_state_ron_roundtrip_preserves_history_and_query() {
