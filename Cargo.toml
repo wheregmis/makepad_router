@@ -9,7 +9,11 @@ homepage = "https://github.com/makepad/makepad/"
 repository = "https://github.com/makepad/makepad/"
 
 [workspace]
-members = ["crates/makepad-router-core", "examples/router_example"]
+members = [
+    "crates/makepad-router-core",
+    "crates/makepad-router-widgets",
+    "examples/router_example",
+]
 
 [dependencies]
 makepad-live-id = { git = "https://github.com/wheregmis/makepad.git", branch = "makepad_router", version = "1.0.0" }
@@ -17,3 +21,4 @@ makepad-micro-serde = { git = "https://github.com/wheregmis/makepad.git", branch
 makepad-draw = { git = "https://github.com/wheregmis/makepad.git", branch = "makepad_router", version = "1.0.0" }
 makepad-widgets = { git = "https://github.com/wheregmis/makepad.git", branch = "makepad_router", version = "1.0.0" }
 makepad-router-core = { path = "crates/makepad-router-core" }
+makepad-router-widgets = { path = "crates/makepad-router-widgets" }

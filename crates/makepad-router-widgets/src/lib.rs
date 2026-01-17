@@ -3,17 +3,6 @@ pub use makepad_live_id;
 pub use makepad_micro_serde;
 pub use makepad_widgets;
 pub use makepad_router_core;
-pub use makepad_router_widgets;
-
-pub mod guards {
-    pub use makepad_router_widgets::guards::*;
-}
-pub mod hero {
-    pub use makepad_router_widgets::hero::*;
-}
-pub mod widget {
-    pub use makepad_router_widgets::widget::*;
-}
 
 pub mod navigation {
     pub use makepad_router_core::navigation::*;
@@ -36,6 +25,10 @@ pub mod state {
 pub mod url {
     pub use makepad_router_core::url::*;
 }
+
+pub mod guards;
+pub mod hero;
+pub mod widget;
 
 // Public API (explicit re-exports only; no wildcard exports).
 pub use crate::guards::{
