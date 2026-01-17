@@ -67,6 +67,40 @@ impl fmt::Display for RouterUrl {
     }
 }
 
+/// Normalize a path or URL for matching (strip scheme/host, query/hash, ensure leading `/`,
+/// and collapse trailing slashes).
+pub fn normalize_path(input: &str) -> String {
+    let mut p = input.trim().to_string();
+    if p.is_empty() {
+        return "/".to_string();
+    }
+    // Accept full URLs too.
+    if let Some((_, after_scheme)) = p.split_once("://") {
+        let mut rest = after_scheme;
+        if let Some((_, after_host_slash)) = rest.split_once('/') {
+            rest = after_host_slash;
+            p = format!("/{}", rest);
+        } else {
+            p = "/".to_string();
+        }
+    }
+    if !p.starts_with('/') {
+        p.insert(0, '/');
+    }
+    // Strip query/hash for matching.
+    if let Some((before_hash, _)) = p.split_once('#') {
+        p = before_hash.to_string();
+    }
+    if let Some((before_q, _)) = p.split_once('?') {
+        p = before_q.to_string();
+    }
+    // Collapse trailing slashes.
+    while p.len() > 1 && p.ends_with('/') {
+        p.pop();
+    }
+    p
+}
+
 /// Parse a query string (`?a=1&b=2`) into a string map.
 pub fn parse_query_map(query: &str) -> HashMap<String, String> {
     let q = query.trim();

@@ -10,7 +10,7 @@ pub mod state;
 pub mod url;
 
 pub use crate::navigation::NavigationHistory;
-pub use crate::pattern::{RouteParams, RoutePattern, RouteSegment};
+pub use crate::pattern::{RouteParams, RoutePattern, RoutePatternRef, RouteSegment};
 pub use crate::registry::RouteRegistry;
 pub use crate::route::{Route, RouteQuery};
 pub use crate::router::{Router, RouterAction};
@@ -18,7 +18,7 @@ pub use crate::state::RouterState;
 pub use crate::url::{build_query_string, parse_query_map, RouterUrl};
 
 pub mod prelude {
-    pub use crate::pattern::{RouteParams, RoutePattern, RouteSegment};
+    pub use crate::pattern::{RouteParams, RoutePattern, RoutePatternRef, RouteSegment};
     pub use crate::route::{Route, RouteQuery};
     pub use crate::router::{Router, RouterAction};
     pub use crate::state::RouterState;

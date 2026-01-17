@@ -1,4 +1,4 @@
-use crate::pattern::{RouteParams, RoutePattern};
+use crate::pattern::{RouteParams, RoutePatternRef};
 use crate::route::Route;
 use makepad_widgets::*;
 use super::{RouterWidget, RouterWidgetWidgetRefExt};
@@ -7,14 +7,14 @@ impl RouterWidget {
     pub(super) fn resolve_nested_prefix(
         &mut self,
         path: &str,
-    ) -> Option<(LiveId, RouteParams, RoutePattern, String)> {
+    ) -> Option<(LiveId, RouteParams, RoutePatternRef, String)> {
         if self.caches.nested_prefix_cache_epoch == self.caches.route_registry_epoch
             && self.caches.nested_prefix_cache_path == path
         {
             return self.caches.nested_prefix_cache_result.clone();
         }
 
-        let mut best: Option<(LiveId, RouteParams, RoutePattern, String, usize)> = None;
+        let mut best: Option<(LiveId, RouteParams, RoutePatternRef, String, usize)> = None;
 
         // Support lazy route widget instantiation by using the static Live-scanned child router paths
         // as candidates, even before the child router widgets are fully instantiated.
