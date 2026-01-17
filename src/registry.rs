@@ -7,7 +7,7 @@
 //! - Priority-based route ordering
 //! - Optimized lookups via indexing
 
-use crate::pattern::{RouteParams, RoutePattern, RouteSegment};
+use crate::pattern::{RoutePattern, RouteSegment};
 use crate::route::Route;
 use makepad_live_id::*;
 use makepad_micro_serde::*;

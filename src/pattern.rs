@@ -46,11 +46,7 @@ impl RoutePattern {
         }
 
         // Normalize: ensure it starts with /
-        let pattern = if pattern.starts_with('/') {
-            &pattern[1..]
-        } else {
-            pattern
-        };
+        let pattern = pattern.strip_prefix('/').unwrap_or(pattern);
 
         let mut segments = Vec::new();
         let parts: Vec<&str> = pattern.split('/').filter(|s| !s.is_empty()).collect();
@@ -65,8 +61,7 @@ impl RoutePattern {
                 break;
             } else if part == &"*" {
                 segments.push(RouteSegment::WildcardSingle);
-            } else if part.starts_with(':') {
-                let param_name = &part[1..];
+            } else if let Some(param_name) = part.strip_prefix(':') {
                 if param_name.is_empty() {
                     return Err("Dynamic segment parameter name cannot be empty".to_string());
                 }
@@ -83,11 +78,7 @@ impl RoutePattern {
     pub fn matches(&self, path: &str) -> Option<RouteParams> {
         let path = path.trim();
         // Normalize: ensure it starts with /
-        let path = if path.starts_with('/') {
-            &path[1..]
-        } else {
-            path
-        };
+        let path = path.strip_prefix('/').unwrap_or(path);
 
         let path_segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
         let mut params = RouteParams::new();
@@ -154,7 +145,7 @@ impl RoutePattern {
     /// - The returned tail is `""` if there is nothing to delegate, otherwise it starts with `/`.
     pub fn matches_prefix_with_tail(&self, path: &str) -> Option<(RouteParams, String)> {
         let path = path.trim();
-        let path = if path.starts_with('/') { &path[1..] } else { path };
+        let path = path.strip_prefix('/').unwrap_or(path);
         let path_segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
 
         let mut params = RouteParams::new();

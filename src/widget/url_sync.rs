@@ -73,9 +73,9 @@ impl RouterWidget {
         self.ensure_web_history_initialized(cx);
 
         if delta < 0 {
-            self.web.history_index = self.web.history_index.saturating_sub((-delta) as i32);
+            self.web.history_index = self.web.history_index.saturating_sub(-delta);
         } else {
-            self.web.history_index = self.web.history_index.saturating_add(delta as i32);
+            self.web.history_index = self.web.history_index.saturating_add(delta);
         }
 
         if self.web.suppress_browser_update {
@@ -141,9 +141,7 @@ impl RouterWidget {
         let tail_trim = tail.trim_start_matches('/');
 
         if tail_trim.is_empty() {
-            if base_trim.is_empty() {
-                "/".to_string()
-            } else if base_trim == "/" {
+            if base_trim.is_empty() || base_trim == "/" {
                 "/".to_string()
             } else {
                 base_trim.to_string()

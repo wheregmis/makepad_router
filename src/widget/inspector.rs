@@ -15,7 +15,7 @@ impl RouterWidget {
             let mut parts = Vec::<String>::new();
             for (i, r) in stack.iter().enumerate().skip(start) {
                 if i == idx {
-                    parts.push(format!("[{}]", r.id.to_string()));
+                    parts.push(format!("[{}]", r.id));
                 } else {
                     parts.push(r.id.to_string());
                 }
@@ -58,7 +58,7 @@ impl RouterWidget {
             if !route.params.data.is_empty() {
                 let mut parts = Vec::<String>::new();
                 for (k, v) in route.params.data.iter().take(3) {
-                    parts.push(format!("{}={}", k.to_string(), v.to_string()));
+                    parts.push(format!("{}={}", k, v));
                 }
                 out.push(format!("params: {}", parts.join(" ")));
             }

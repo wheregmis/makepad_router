@@ -298,11 +298,9 @@ impl RouterWidget {
         let walk = Walk::fill();
         if force_redraw {
             draw_list.begin_always(cx);
-        } else {
-            if draw_list.begin(cx, walk).is_not_redrawing() {
-                cx.walk_turtle(walk);
-                return;
-            }
+        } else if draw_list.begin(cx, walk).is_not_redrawing() {
+            cx.walk_turtle(walk);
+            return;
         }
 
         let draw_list_id = draw_list.id();
