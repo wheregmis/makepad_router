@@ -7,8 +7,9 @@
 //! - Priority-based route ordering
 //! - Optimized lookups via indexing
 
-use crate::pattern::{RoutePattern, RouteSegment};
+use crate::pattern::{RoutePattern, RoutePatternRef, RouteSegment};
 use crate::route::Route;
+use crate::url;
 use makepad_live_id::*;
 use makepad_micro_serde::*;
 use std::collections::HashMap;
@@ -18,7 +19,7 @@ use std::collections::HashMap;
 #[derive(Clone, Debug, SerBin, DeBin, SerRon, DeRon)]
 struct RouteEntry {
     route_id: LiveId,
-    pattern: Option<RoutePattern>,
+    pattern: Option<RoutePatternRef>,
     priority: usize,
 }
 
@@ -65,7 +66,7 @@ impl RouteRegistry {
         let priority = route_pattern.priority();
         let entry = RouteEntry {
             route_id,
-            pattern: Some(route_pattern),
+            pattern: Some(RoutePatternRef::new(route_pattern)),
             priority,
         };
 
@@ -83,7 +84,7 @@ impl RouteRegistry {
 
     /// Resolve a path to a route (exact static match first, then pattern match).
     pub fn resolve_path(&self, path: &str) -> Option<Route> {
-        let normalized = Self::normalize_path(path);
+        let normalized = url::normalize_path(path);
 
         if let Some(route_id) = self.exact_static.get(&normalized).copied() {
             let pattern = self.by_id.get(&route_id).and_then(|e| e.pattern.clone());
@@ -142,40 +143,8 @@ impl RouteRegistry {
     }
 
     /// Get pattern for a route ID (if registered with a pattern).
-    pub fn get_pattern(&self, route_id: LiveId) -> Option<&RoutePattern> {
+    pub fn get_pattern(&self, route_id: LiveId) -> Option<&RoutePatternRef> {
         self.by_id.get(&route_id).and_then(|e| e.pattern.as_ref())
-    }
-
-    fn normalize_path(path: &str) -> String {
-        let mut p = path.trim().to_string();
-        if p.is_empty() {
-            return "/".to_string();
-        }
-        // Accept full URLs too (same behavior as RouterUrl::parse).
-        if let Some((_, after_scheme)) = p.split_once("://") {
-            let mut rest = after_scheme;
-            if let Some((_, after_host_slash)) = rest.split_once('/') {
-                rest = after_host_slash;
-                p = format!("/{}", rest);
-            } else {
-                p = "/".to_string();
-            }
-        }
-        if !p.starts_with('/') {
-            p.insert(0, '/');
-        }
-        // Strip query/hash for matching.
-        if let Some((before_hash, _)) = p.split_once('#') {
-            p = before_hash.to_string();
-        }
-        if let Some((before_q, _)) = p.split_once('?') {
-            p = before_q.to_string();
-        }
-        // Collapse trailing slashes.
-        while p.len() > 1 && p.ends_with('/') {
-            p.pop();
-        }
-        p
     }
 
     fn rebuild_indices(&mut self) {

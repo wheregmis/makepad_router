@@ -2,7 +2,7 @@
 
 use makepad_live_id::*;
 use makepad_micro_serde::*;
-use crate::pattern::{RouteParams, RoutePattern};
+use crate::pattern::{RouteParams, RoutePattern, RoutePatternRef};
 use crate::url;
 use std::collections::HashMap;
 
@@ -19,7 +19,7 @@ pub struct Route {
     /// Optional hash fragment for the route (including the leading `#`).
     pub hash: String,
     /// Optional route pattern for path-based matching
-    pub pattern: Option<RoutePattern>,
+    pub pattern: Option<RoutePatternRef>,
 }
 
 /// Query parameters stored as a string map.
@@ -61,19 +61,19 @@ impl Route {
             params: RouteParams::default(),
             query: RouteQuery::default(),
             hash: String::new(),
-            pattern: Some(route_pattern),
+            pattern: Some(RoutePatternRef::new(route_pattern)),
         })
     }
 
     /// Add a parameter to the route
     pub fn param(mut self, key: LiveId, value: LiveId) -> Self {
-        self.params.data.insert(key, value);
+        self.params.add(key, value);
         self
     }
 
     /// Get a parameter value by key
     pub fn get_param(&self, key: LiveId) -> Option<LiveId> {
-        self.params.data.get(&key).copied()
+        self.params.get(key)
     }
 
     /// Get a parameter value as a `String`.

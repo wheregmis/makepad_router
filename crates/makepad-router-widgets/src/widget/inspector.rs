@@ -55,9 +55,9 @@ impl RouterWidget {
         }
 
         if let Some(route) = self.router.current_route() {
-            if !route.params.data.is_empty() {
+            if !route.params.is_empty() {
                 let mut parts = Vec::<String>::new();
-                for (k, v) in route.params.data.iter().take(3) {
+                for (k, v) in route.params.iter().take(3) {
                     parts.push(format!("{}={}", k, v));
                 }
                 out.push(format!("params: {}", parts.join(" ")));

@@ -9,6 +9,8 @@
 use makepad_live_id::*;
 use makepad_micro_serde::*;
 use std::collections::HashMap;
+use std::ops::Deref;
+use std::sync::Arc;
 
 /// Represents a route segment type in a pattern
 #[derive(Clone, Debug, PartialEq, Eq, Hash, SerBin, DeBin, SerRon, DeRon)]
@@ -16,7 +18,7 @@ pub enum RouteSegment {
     /// Static segment (e.g., "user", "profile")
     Static(String),
     /// Dynamic segment with parameter name (e.g., ":id", ":postId")
-    Dynamic(String),
+    Dynamic { name: String, key: LiveId },
     /// Single-segment wildcard
     WildcardSingle,
     /// Multi-segment wildcard
@@ -30,11 +32,67 @@ pub struct RoutePattern {
     pub segments: Vec<RouteSegment>,
 }
 
-/// Route parameters - can be extended with typed parameters in the future
-#[derive(Clone, Debug, Default, PartialEq, Eq, SerBin, DeBin, SerRon, DeRon)]
+/// Shared route pattern reference (Arc-backed) for cheap cloning.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct RoutePatternRef(Arc<RoutePattern>);
+
+impl RoutePatternRef {
+    pub fn new(pattern: RoutePattern) -> Self {
+        Self(Arc::new(pattern))
+    }
+}
+
+impl Deref for RoutePatternRef {
+    type Target = RoutePattern;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl AsRef<RoutePattern> for RoutePatternRef {
+    fn as_ref(&self) -> &RoutePattern {
+        &self.0
+    }
+}
+
+impl SerBin for RoutePatternRef {
+    fn ser_bin(&self, s: &mut Vec<u8>) {
+        self.0.ser_bin(s);
+    }
+}
+
+impl DeBin for RoutePatternRef {
+    fn de_bin(o: &mut usize, d: &[u8]) -> Result<Self, DeBinErr> {
+        let pattern = RoutePattern::de_bin(o, d)?;
+        Ok(Self(Arc::new(pattern)))
+    }
+}
+
+impl SerRon for RoutePatternRef {
+    fn ser_ron(&self, d: usize, s: &mut SerRonState) {
+        self.0.ser_ron(d, s);
+    }
+}
+
+impl DeRon for RoutePatternRef {
+    fn de_ron(s: &mut DeRonState, i: &mut std::str::Chars) -> Result<Self, DeRonErr> {
+        let pattern = RoutePattern::de_ron(s, i)?;
+        Ok(Self(Arc::new(pattern)))
+    }
+}
+
+/// Route parameters - optimized for small param counts.
+#[derive(Clone, Debug, Default)]
 pub struct RouteParams {
-    /// Generic parameters stored as LiveId key-value pairs
-    pub data: HashMap<LiveId, LiveId>,
+    /// Generic parameters stored as LiveId key-value pairs.
+    pub data: RouteParamStore,
+}
+
+#[derive(Clone, Debug)]
+pub enum RouteParamStore {
+    Small(Vec<(LiveId, LiveId)>),
+    Map(HashMap<LiveId, LiveId>),
 }
 
 impl RoutePattern {
@@ -65,7 +123,9 @@ impl RoutePattern {
                 if param_name.is_empty() {
                     return Err("Dynamic segment parameter name cannot be empty".to_string());
                 }
-                segments.push(RouteSegment::Dynamic(param_name.to_string()));
+                let name = param_name.to_string();
+                let key = LiveId::from_str(param_name);
+                segments.push(RouteSegment::Dynamic { name, key });
             } else {
                 segments.push(RouteSegment::Static(part.to_string()));
             }
@@ -93,13 +153,12 @@ impl RoutePattern {
                     }
                     path_idx += 1;
                 }
-                RouteSegment::Dynamic(param_name) => {
+                RouteSegment::Dynamic { key, .. } => {
                     let value = path_segments[path_idx];
-                    let param_key = LiveId::from_str(param_name);
                     // Use from_str_with_intern to store the string so it can be retrieved later
                     use makepad_live_id::InternLiveId;
                     let param_value = LiveId::from_str_with_intern(value, InternLiveId::Yes);
-                    params.add(param_key, param_value);
+                    params.add(*key, param_value);
                     path_idx += 1;
                 }
                 RouteSegment::WildcardSingle => {
@@ -161,12 +220,11 @@ impl RoutePattern {
                     }
                     path_idx += 1;
                 }
-                RouteSegment::Dynamic(param_name) => {
+                RouteSegment::Dynamic { key, .. } => {
                     let value = path_segments[path_idx];
-                    let param_key = LiveId::from_str(param_name);
                     use makepad_live_id::InternLiveId;
                     let param_value = LiveId::from_str_with_intern(value, InternLiveId::Yes);
-                    params.add(param_key, param_value);
+                    params.add(*key, param_value);
                     path_idx += 1;
                 }
                 RouteSegment::WildcardSingle => {
@@ -222,7 +280,7 @@ impl RoutePattern {
         for segment in &self.segments {
             match segment {
                 RouteSegment::Static(_) => priority += 1,
-                RouteSegment::Dynamic(_) => priority += 100,
+                RouteSegment::Dynamic { .. } => priority += 100,
                 RouteSegment::WildcardSingle => priority += 10000,
                 RouteSegment::WildcardMulti => priority += 100000,
             }
@@ -236,9 +294,8 @@ impl RoutePattern {
         for segment in &self.segments {
             match segment {
                 RouteSegment::Static(s) => out.push(s.clone()),
-                RouteSegment::Dynamic(param_name) => {
-                    let key = LiveId::from_str(param_name);
-                    let value = params.get(key)?;
+                RouteSegment::Dynamic { key, .. } => {
+                    let value = params.get(*key)?;
                     out.push(value.to_string());
                 }
                 RouteSegment::WildcardSingle | RouteSegment::WildcardMulti => return None,
@@ -255,9 +312,8 @@ impl RoutePattern {
         for segment in &self.segments {
             match segment {
                 RouteSegment::Static(s) => out.push(s.clone()),
-                RouteSegment::Dynamic(param_name) => {
-                    let key = LiveId::from_str(param_name);
-                    if let Some(value) = params.get(key) {
+                RouteSegment::Dynamic { key, .. } => {
+                    if let Some(value) = params.get(*key) {
                         out.push(value.to_string());
                     } else {
                         break;
@@ -282,12 +338,139 @@ impl RouteParams {
 
     /// Add a parameter
     pub fn add(&mut self, key: LiveId, value: LiveId) {
-        self.data.insert(key, value);
+        match &mut self.data {
+            RouteParamStore::Small(entries) => {
+                for (k, v) in entries.iter_mut() {
+                    if *k == key {
+                        *v = value;
+                        return;
+                    }
+                }
+                if entries.len() < 4 {
+                    entries.push((key, value));
+                } else {
+                    let mut map: HashMap<LiveId, LiveId> = entries.iter().copied().collect();
+                    map.insert(key, value);
+                    self.data = RouteParamStore::Map(map);
+                }
+            }
+            RouteParamStore::Map(map) => {
+                map.insert(key, value);
+            }
+        }
     }
 
     /// Get a parameter value by key
     pub fn get(&self, key: LiveId) -> Option<LiveId> {
-        self.data.get(&key).copied()
+        match &self.data {
+            RouteParamStore::Small(entries) => entries
+                .iter()
+                .find(|(k, _)| *k == key)
+                .map(|(_, v)| *v),
+            RouteParamStore::Map(map) => map.get(&key).copied(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        match &self.data {
+            RouteParamStore::Small(entries) => entries.is_empty(),
+            RouteParamStore::Map(map) => map.is_empty(),
+        }
+    }
+
+    pub fn iter(&self) -> RouteParamIter<'_> {
+        match &self.data {
+            RouteParamStore::Small(entries) => RouteParamIter::Small(entries.iter()),
+            RouteParamStore::Map(map) => RouteParamIter::Map(map.iter()),
+        }
+    }
+}
+
+impl Default for RouteParamStore {
+    fn default() -> Self {
+        RouteParamStore::Small(Vec::new())
+    }
+}
+
+impl PartialEq for RouteParams {
+    fn eq(&self, other: &Self) -> bool {
+        if self.len() != other.len() {
+            return false;
+        }
+        self.iter().all(|(k, v)| other.get(*k) == Some(*v))
+    }
+}
+
+impl Eq for RouteParams {}
+
+impl RouteParams {
+    fn len(&self) -> usize {
+        match &self.data {
+            RouteParamStore::Small(entries) => entries.len(),
+            RouteParamStore::Map(map) => map.len(),
+        }
+    }
+
+    fn to_hash_map(&self) -> HashMap<LiveId, LiveId> {
+        match &self.data {
+            RouteParamStore::Small(entries) => entries.iter().copied().collect(),
+            RouteParamStore::Map(map) => map.clone(),
+        }
+    }
+
+    fn from_hash_map(map: HashMap<LiveId, LiveId>) -> Self {
+        if map.len() <= 4 {
+            let entries = map.into_iter().collect();
+            Self {
+                data: RouteParamStore::Small(entries),
+            }
+        } else {
+            Self {
+                data: RouteParamStore::Map(map),
+            }
+        }
+    }
+}
+
+pub enum RouteParamIter<'a> {
+    Small(std::slice::Iter<'a, (LiveId, LiveId)>),
+    Map(std::collections::hash_map::Iter<'a, LiveId, LiveId>),
+}
+
+impl<'a> Iterator for RouteParamIter<'a> {
+    type Item = (&'a LiveId, &'a LiveId);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            RouteParamIter::Small(iter) => iter.next().map(|(k, v)| (k, v)),
+            RouteParamIter::Map(iter) => iter.next(),
+        }
+    }
+}
+
+impl SerBin for RouteParams {
+    fn ser_bin(&self, s: &mut Vec<u8>) {
+        self.to_hash_map().ser_bin(s);
+    }
+}
+
+impl DeBin for RouteParams {
+    fn de_bin(o: &mut usize, d: &[u8]) -> Result<Self, DeBinErr> {
+        let map = HashMap::<LiveId, LiveId>::de_bin(o, d)?;
+        Ok(Self::from_hash_map(map))
+    }
+}
+
+impl SerRon for RouteParams {
+    fn ser_ron(&self, d: usize, s: &mut SerRonState) {
+        self.to_hash_map().ser_ron(d, s);
+    }
+}
+
+impl DeRon for RouteParams {
+    fn de_ron(s: &mut DeRonState, i: &mut std::str::Chars) -> Result<Self, DeRonErr> {
+        let map = HashMap::<LiveId, LiveId>::de_ron(s, i)?;
+        Ok(Self::from_hash_map(map))
     }
 }
 
@@ -308,7 +491,7 @@ mod tests {
         let pattern = RoutePattern::parse("/user/:id").unwrap();
         assert_eq!(pattern.segments.len(), 2);
         assert!(matches!(pattern.segments[0], RouteSegment::Static(ref s) if s == "user"));
-        assert!(matches!(pattern.segments[1], RouteSegment::Dynamic(ref s) if s == "id"));
+        assert!(matches!(pattern.segments[1], RouteSegment::Dynamic { ref name, .. } if name == "id"));
     }
 
     #[test]
@@ -332,7 +515,7 @@ mod tests {
         let pattern = RoutePattern::parse("/user/:id/posts/*").unwrap();
         assert_eq!(pattern.segments.len(), 4);
         assert!(matches!(pattern.segments[0], RouteSegment::Static(ref s) if s == "user"));
-        assert!(matches!(pattern.segments[1], RouteSegment::Dynamic(ref s) if s == "id"));
+        assert!(matches!(pattern.segments[1], RouteSegment::Dynamic { ref name, .. } if name == "id"));
         assert!(matches!(pattern.segments[2], RouteSegment::Static(ref s) if s == "posts"));
         assert!(matches!(pattern.segments[3], RouteSegment::WildcardSingle));
     }

@@ -44,20 +44,24 @@ impl NavigationHistory {
     pub fn push(&mut self, route: Route) {
         // Remove any forward history when pushing a new route
         self.stack.truncate(self.current_index + 1);
+        self.rebuild_index_for_truncate(self.current_index + 1);
         self.stack.push(route);
         self.current_index = self.stack.len() - 1;
-        self.rebuild_index();
+        self.index_entry(self.current_index);
     }
 
     /// Replace the current route without adding to history
     pub fn replace(&mut self, route: Route) {
         if !self.stack.is_empty() {
-            self.stack[self.current_index] = route;
+            let idx = self.current_index;
+            self.unindex_entry(idx);
+            self.stack[idx] = route;
+            self.index_entry(idx);
         } else {
             self.stack.push(route);
             self.current_index = 0;
+            self.index_entry(0);
         }
-        self.rebuild_index();
     }
 
     /// Go back in history
@@ -100,18 +104,20 @@ impl NavigationHistory {
         if let Some(current) = self.current().cloned() {
             self.stack = vec![current];
             self.current_index = 0;
+            self.rebuild_index();
         } else {
             self.stack.clear();
             self.current_index = 0;
+            self.index.clear();
         }
-        self.rebuild_index();
     }
 
     /// Reset to a specific route, clearing all history
     pub fn reset(&mut self, route: Route) {
         self.stack = vec![route];
         self.current_index = 0;
-        self.rebuild_index();
+        self.index.clear();
+        self.index_entry(0);
     }
 
     /// Get all routes in the stack
@@ -152,7 +158,7 @@ impl NavigationHistory {
         if stack.is_empty() {
             self.stack.clear();
             self.current_index = 0;
-            self.rebuild_index();
+            self.index.clear();
             return;
         }
         self.stack = stack;
@@ -167,9 +173,10 @@ impl NavigationHistory {
         if self.stack.len() <= 1 {
             return false;
         }
+        let idx = self.stack.len() - 1;
+        self.unindex_entry(idx);
         self.stack.pop();
         self.current_index = self.stack.len() - 1;
-        self.rebuild_index();
         true
     }
 
@@ -190,7 +197,7 @@ impl NavigationHistory {
         };
         self.stack.truncate(pos + 1);
         self.current_index = pos;
-        self.rebuild_index();
+        self.rebuild_index_for_truncate(pos + 1);
         true
     }
 
@@ -201,7 +208,7 @@ impl NavigationHistory {
         }
         self.stack.truncate(1);
         self.current_index = 0;
-        self.rebuild_index();
+        self.rebuild_index_for_truncate(1);
         true
     }
 
@@ -211,6 +218,42 @@ impl NavigationHistory {
             self.index.entry(r.id).or_default().push(i);
         }
         // Clamp in case stack was externally mutated.
+        if self.stack.is_empty() {
+            self.current_index = 0;
+        } else {
+            self.current_index = self.current_index.min(self.stack.len() - 1);
+        }
+    }
+
+    fn index_entry(&mut self, idx: usize) {
+        if let Some(route) = self.stack.get(idx) {
+            self.index.entry(route.id).or_default().push(idx);
+        }
+    }
+
+    fn unindex_entry(&mut self, idx: usize) {
+        if let Some(route) = self.stack.get(idx) {
+            if let Some(list) = self.index.get_mut(&route.id) {
+                if let Some(pos) = list.iter().position(|&v| v == idx) {
+                    list.remove(pos);
+                }
+                if list.is_empty() {
+                    self.index.remove(&route.id);
+                }
+            }
+        }
+    }
+
+    fn rebuild_index_for_truncate(&mut self, new_len: usize) {
+        let keys: Vec<LiveId> = self.index.keys().copied().collect();
+        for key in keys {
+            if let Some(list) = self.index.get_mut(&key) {
+                list.retain(|&idx| idx < new_len);
+                if list.is_empty() {
+                    self.index.remove(&key);
+                }
+            }
+        }
         if self.stack.is_empty() {
             self.current_index = 0;
         } else {

@@ -1,4 +1,4 @@
-use crate::{pattern::{RouteParams, RoutePattern}, url::RouterUrl};
+use crate::{pattern::{RouteParams, RoutePatternRef}, url::RouterUrl};
 use makepad_widgets::*;
 
 use super::RouterTransitionState;
@@ -38,7 +38,7 @@ pub(crate) struct RouterCaches {
     pub(crate) route_registry_epoch: u64,
     pub(crate) nested_prefix_cache_epoch: u64,
     pub(crate) nested_prefix_cache_path: String,
-    pub(crate) nested_prefix_cache_result: Option<(LiveId, RouteParams, RoutePattern, String)>,
+    pub(crate) nested_prefix_cache_result: Option<(LiveId, RouteParams, RoutePatternRef, String)>,
     pub(crate) url_parse_cache: Vec<(String, RouterUrl)>,
 }
 
