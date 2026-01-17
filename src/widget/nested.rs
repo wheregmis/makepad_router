@@ -1,4 +1,5 @@
-use crate::route::{Route, RouteParams, RoutePattern};
+use crate::pattern::{RouteParams, RoutePattern};
+use crate::route::Route;
 use makepad_widgets::*;
 use super::{RouterWidget, RouterWidgetWidgetRefExt};
 

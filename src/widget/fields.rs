@@ -1,4 +1,4 @@
-use crate::{route::RouteParams, route::RoutePattern, url::RouterUrl};
+use crate::{pattern::{RouteParams, RoutePattern}, url::RouterUrl};
 use makepad_widgets::*;
 
 use super::RouterTransitionState;

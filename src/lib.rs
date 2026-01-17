@@ -6,6 +6,7 @@ pub use makepad_widgets;
 pub mod guards;
 pub mod hero;
 pub mod navigation;
+pub mod pattern;
 pub mod route;
 pub mod router;
 pub mod state;
@@ -20,7 +21,8 @@ pub use crate::guards::{
 };
 pub use crate::hero::Hero;
 pub use crate::navigation::NavigationHistory;
-pub use crate::route::{Route, RouteParams, RoutePattern, RouteQuery};
+pub use crate::pattern::{RouteParams, RoutePattern, RouteSegment};
+pub use crate::route::{Route, RouteQuery};
 pub use crate::router::{RouteRegistry, Router, RouterAction};
 pub use crate::state::RouterState;
 pub use crate::url::{build_query_string, parse_query_map, RouterUrl};
@@ -37,7 +39,8 @@ pub mod prelude {
         RouterRedirect, RouterRedirectTarget,
     };
     pub use crate::hero::Hero;
-    pub use crate::route::{Route, RouteParams, RoutePattern, RouteQuery};
+    pub use crate::pattern::{RouteParams, RoutePattern, RouteSegment};
+    pub use crate::route::{Route, RouteQuery};
     pub use crate::router::{Router, RouterAction};
     pub use crate::state::RouterState;
     pub use crate::url::RouterUrl;

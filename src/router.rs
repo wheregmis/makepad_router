@@ -1,6 +1,7 @@
 use crate::{
     navigation::NavigationHistory,
-    route::{Route, RoutePattern, RouteSegment},
+    pattern::{RoutePattern, RouteSegment},
+    route::Route,
 };
 use makepad_live_id::*;
 use makepad_micro_serde::*;
