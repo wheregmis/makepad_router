@@ -26,7 +26,7 @@ impl RouterWidget {
 
         // 1) Full match in this router.
         if let Some(mut route) = self.router.route_registry.resolve_path(&path) {
-            if self.route_templates.contains_key(&route.id) {
+            if self.routes.templates.contains_key(&route.id) {
                 let old_route = self.router.current_route().cloned();
                 route.query = query.clone();
                 route.hash = hash.clone();
@@ -66,7 +66,7 @@ impl RouterWidget {
 
         // 2) Prefix match for nested routing: activate a parent route and delegate the tail.
         if let Some((route_id, params, pattern, tail)) = self.resolve_nested_prefix(&path) {
-            if self.route_templates.contains_key(&route_id) {
+            if self.routes.templates.contains_key(&route_id) {
                 let old_route = self.router.current_route().cloned();
                 let parent_route = Route {
                     id: route_id,
@@ -101,7 +101,7 @@ impl RouterWidget {
         }
 
         // 3) Not-found fallback.
-        if self.not_found_route.0 != 0 && self.route_templates.contains_key(&self.not_found_route) {
+        if self.not_found_route.0 != 0 && self.routes.templates.contains_key(&self.not_found_route) {
             // Push not-found so the user can navigate back to the previous page.
             // Preserve the attempted path in the address bar.
             if self.current_route_id() != Some(self.not_found_route) {
@@ -157,7 +157,7 @@ impl RouterWidget {
         }
 
         if let Some(mut route) = self.router.route_registry.resolve_path(&path) {
-            if self.route_templates.contains_key(&route.id) {
+            if self.routes.templates.contains_key(&route.id) {
                 let old_route = self.router.current_route().cloned();
                 route.query = query.clone();
                 route.hash = hash.clone();
@@ -194,7 +194,7 @@ impl RouterWidget {
         }
 
         if let Some((route_id, params, pattern, tail)) = self.resolve_nested_prefix(&path) {
-            if self.route_templates.contains_key(&route_id) {
+            if self.routes.templates.contains_key(&route_id) {
                 let old_route = self.router.current_route().cloned();
                 let parent_route = Route {
                     id: route_id,
@@ -228,7 +228,7 @@ impl RouterWidget {
             }
         }
 
-        if self.not_found_route.0 != 0 && self.route_templates.contains_key(&self.not_found_route) {
+        if self.not_found_route.0 != 0 && self.routes.templates.contains_key(&self.not_found_route) {
             self.web.url_path_override = Some(path);
             let old_route = self.router.current_route().cloned();
             let mut nf = Route::new(self.not_found_route);

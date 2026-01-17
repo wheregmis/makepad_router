@@ -15,6 +15,17 @@ A standalone routing package for Makepad applications, providing navigation, dee
 - **State persistence** via SerRon/DeRon
 - **Debug inspector overlay** for dev diagnostics
 
+## RouterWidget Toggles
+
+These Live properties control optional subsystems. All default to behavior shown in the example app.
+
+- `url_sync` (bool): sync route changes into browser URL/history on web builds.
+- `use_initial_url` (bool): apply the initial browser URL on startup (web only).
+- `persist_state` (bool): serialize/restore router state via `RouterState`.
+- `hero_transition` (bool): enable shared-element transitions (requires `Hero` widgets).
+- `debug_inspector` (bool): show a small overlay with route/stack/params.
+- `push_transition`, `pop_transition`, `replace_transition`, `transition_duration`: configure route transitions.
+
 ## Quick Start
 
 ```rust

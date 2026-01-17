@@ -1,3 +1,5 @@
+//! Shared-element ("hero") rendering hooks for route transitions.
+
 use crate::hero::{HeroGlobals, HeroPhase};
 use makepad_draw::draw_list_2d::DrawListExt;
 use makepad_widgets::*;
@@ -28,12 +30,12 @@ impl RouterWidget {
                 }
 
                 cx.global::<HeroGlobals>().set_phase(HeroPhase::CaptureFrom);
-                if let Some(widget) = self.route_widgets.get_mut(&state_snapshot.from_route) {
+                if let Some(widget) = self.routes.widgets.get_mut(&state_snapshot.from_route) {
                     let _ = widget.draw_walk(cx, scope, Walk::fill().with_abs_pos(rect.pos));
                 }
 
                 cx.global::<HeroGlobals>().set_phase(HeroPhase::CaptureTo);
-                if let Some(widget) = self.route_widgets.get_mut(&state_snapshot.to_route) {
+                if let Some(widget) = self.routes.widgets.get_mut(&state_snapshot.to_route) {
                     let _ = widget.draw_walk(cx, scope, Walk::fill().with_abs_pos(rect.pos));
                 }
 
@@ -71,7 +73,7 @@ impl RouterWidget {
                 cx,
                 scope,
                 &mut self.draw_lists.from,
-                &mut self.route_widgets,
+                &mut self.routes.widgets,
                 state.from_route,
                 from_effect,
                 true,
@@ -89,7 +91,7 @@ impl RouterWidget {
                 cx,
                 scope,
                 &mut self.draw_lists.to,
-                &mut self.route_widgets,
+                &mut self.routes.widgets,
                 state.to_route,
                 to_effect,
                 true,
@@ -156,7 +158,7 @@ impl RouterWidget {
                 cx,
                 scope,
                 &mut self.draw_lists.to,
-                &mut self.route_widgets,
+                &mut self.routes.widgets,
                 self.active_route,
                 effect,
                 false,

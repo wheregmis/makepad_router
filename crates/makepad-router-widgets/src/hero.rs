@@ -2,6 +2,8 @@ use makepad_widgets::*;
 use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Shared-element ("hero") widget and state tracking.
+
 pub(crate) enum HeroPhase {
     Idle,
     CaptureFrom,

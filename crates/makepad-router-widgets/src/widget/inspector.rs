@@ -1,6 +1,8 @@
 use makepad_draw::draw_list_2d::DrawListExt;
 use makepad_widgets::{dvec2, Cx2d, Rect};
 
+// Debug inspector overlay for RouterWidget.
+
 use super::RouterWidget;
 
 impl RouterWidget {

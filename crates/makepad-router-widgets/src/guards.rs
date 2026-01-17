@@ -2,6 +2,8 @@ use crate::route::Route;
 use makepad_live_id::LiveId;
 use makepad_widgets::{Cx, ToUIReceiver};
 
+// Guard and before-leave types for RouterWidget.
+
 /// Kind of navigation request being evaluated by guards/hooks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RouterNavKind {

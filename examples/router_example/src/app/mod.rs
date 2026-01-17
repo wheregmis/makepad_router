@@ -198,7 +198,11 @@ impl MatchEvent for App {
         if self.ui.button(ids!(nav_bar.detail_btn)).clicked(actions) {
             router.navigate_by_path(cx, "/detail/42");
         }
-        if self.ui.button(ids!(nav_bar.broken_link_btn)).clicked(actions) {
+        if self
+            .ui
+            .button(ids!(nav_bar.broken_link_btn))
+            .clicked(actions)
+        {
             router.navigate_by_path(cx, "/this/route/does/not/exist");
         }
         if self.ui.button(ids!(nav_bar.back_btn)).clicked(actions) {
@@ -207,14 +211,10 @@ impl MatchEvent for App {
 
         // Routed buttons: delegate to the active page controller (route-scoped widget access).
         match router.current_route_id() {
-            Some(route_id) if route_id == live_id!(home) => self.home.handle_actions(cx, actions, &router),
-            Some(route_id) if route_id == live_id!(settings) => {
-                self.settings.handle_actions(cx, actions, &router)
-            }
-            Some(route_id) if route_id == live_id!(detail) => self.detail.handle_actions(cx, actions, &router),
-            Some(route_id) if route_id == live_id!(not_found) => {
-                self.not_found.handle_actions(cx, actions, &router)
-            }
+            Some(live_id!(home)) => self.home.handle_actions(cx, actions, &router),
+            Some(live_id!(settings)) => self.settings.handle_actions(cx, actions, &router),
+            Some(live_id!(detail)) => self.detail.handle_actions(cx, actions, &router),
+            Some(live_id!(not_found)) => self.not_found.handle_actions(cx, actions, &router),
             _ => {}
         }
 
@@ -228,9 +228,13 @@ impl MatchEvent for App {
                 .current_route_id()
                 .map(|id: LiveId| id.to_string())
                 .unwrap_or_else(|| "(none)".to_string()),
-            router.current_url().unwrap_or_else(|| "(no url)".to_string())
+            router
+                .current_url()
+                .unwrap_or_else(|| "(no url)".to_string())
         );
-        self.ui.label(ids!(nav_bar.status_label)).set_text(cx, &status);
+        self.ui
+            .label(ids!(nav_bar.status_label))
+            .set_text(cx, &status);
     }
 }
 

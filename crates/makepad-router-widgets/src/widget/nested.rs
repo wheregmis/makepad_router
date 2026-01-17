@@ -1,6 +1,8 @@
 use crate::pattern::{RouteParams, RoutePatternRef};
 use crate::route::Route;
 use makepad_widgets::*;
+// Nested router discovery and child router registration.
+
 use super::{RouterWidget, RouterWidgetWidgetRefExt};
 
 impl RouterWidget {
@@ -18,7 +20,7 @@ impl RouterWidget {
 
         // Support lazy route widget instantiation by using the static Live-scanned child router paths
         // as candidates, even before the child router widgets are fully instantiated.
-        for route_id in self.child_router_paths.keys().cloned().chain(self.child_routers.keys().cloned()) {
+        for route_id in self.routes.child_router_paths.keys().cloned().chain(self.child_routers.keys().cloned()) {
             let Some(pattern_obj) = self.router.route_registry.get_pattern(route_id) else {
                 continue;
             };
@@ -65,11 +67,11 @@ impl RouterWidget {
     /// We scan the Live DSL for nested `RouterWidget` instances (and their widget-id paths) in
     /// `apply_value_instance`, then resolve those paths against the instantiated route widgets here.
     pub(super) fn detect_child_routers(&mut self, _cx: &mut Cx) {
-        for (route_id, route_widget) in self.route_widgets.iter() {
+        for (route_id, route_widget) in self.routes.widgets.iter() {
             if self.child_routers.contains_key(route_id) {
                 continue;
             }
-            let Some(paths) = self.child_router_paths.get(route_id) else {
+            let Some(paths) = self.routes.child_router_paths.get(route_id) else {
                 continue;
             };
             for path in paths {
@@ -143,7 +145,7 @@ impl RouterWidget {
     pub fn navigate_nested(&mut self, cx: &mut Cx, path: &[LiveId], route: Route) -> bool {
         if path.is_empty() {
             // Navigate in current router.
-            if self.route_templates.contains_key(&route.id) {
+            if self.routes.templates.contains_key(&route.id) {
                 let old_route = self.router.current_route().cloned();
                 self.router.navigate(route.clone());
                 self.active_route = route.id;
