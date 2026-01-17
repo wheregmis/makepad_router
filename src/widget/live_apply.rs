@@ -1,5 +1,5 @@
+use crate::registry::RouteRegistry;
 use crate::route::Route;
-use crate::router::RouteRegistry;
 use makepad_widgets::*;
 
 use super::RouterWidget;
