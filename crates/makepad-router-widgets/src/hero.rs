@@ -122,18 +122,14 @@ impl HeroGlobals {
     }
 }
 
-#[derive(Live, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct Hero {
     #[deref]
     view: View,
     /// Tag used to match heroes between routes during transitions.
     #[live]
     tag: LiveId,
-    #[rust(DrawList2d::new(cx))]
-    hidden_draw_list: DrawList2d,
 }
-
-impl LiveHook for Hero {}
 
 impl Widget for Hero {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
@@ -163,23 +159,8 @@ impl Widget for Hero {
         };
 
         let step = if should_hide {
-            let redrawing = self.hidden_draw_list.begin(cx, walk);
-            if redrawing.is_not_redrawing() {
-                cx.walk_turtle(walk);
-                return DrawStep::done();
-            }
-
-            let draw_list_id = self.hidden_draw_list.id();
-            {
-                let dl = &mut cx.cx.cx.draw_lists[draw_list_id];
-                dl.draw_list_uniforms.view_shift = vec2(0.0, 0.0);
-                dl.draw_list_uniforms.view_transform = Mat4f::identity();
-                dl.draw_list_uniforms.view_opacity = 0.0;
-            }
-
-            let step = self.view.draw_walk(cx, scope, walk);
-            self.hidden_draw_list.end(cx);
-            step
+            cx.walk_turtle(walk);
+            DrawStep::done()
         } else {
             self.view.draw_walk(cx, scope, walk)
         };

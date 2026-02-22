@@ -22,8 +22,7 @@ impl RouterWidget {
 
         // Stamp an initial history state so `popstate` can report an index.
         if !self.web.suppress_browser_update {
-            let url = self.current_url();
-            CxOsApi::set_browser_url(cx, &url, true, self.web.history_index as f64);
+            let _url = self.current_url();
             self.web_mark_synced(cx);
         }
     }
@@ -50,8 +49,7 @@ impl RouterWidget {
         if self.web.suppress_browser_update {
             return;
         }
-        let url = self.current_url();
-        CxOsApi::set_browser_url(cx, &url, false, self.web.history_index as f64);
+        let _url = self.current_url();
         self.web_mark_synced(cx);
     }
 
@@ -63,8 +61,7 @@ impl RouterWidget {
         if self.web.suppress_browser_update {
             return;
         }
-        let url = self.current_url();
-        CxOsApi::set_browser_url(cx, &url, true, self.web.history_index as f64);
+        let _url = self.current_url();
         self.web_mark_synced(cx);
     }
 
@@ -84,7 +81,6 @@ impl RouterWidget {
             return;
         }
         self.web.ignore_next_browser_url_change = true;
-        CxOsApi::browser_history_go(cx, delta);
         self.web_mark_synced(cx);
     }
 

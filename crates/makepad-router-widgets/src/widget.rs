@@ -39,32 +39,35 @@ use fields::{
 use transitions::{RouterActionKind, RouterTransitionDirection, RouterTransitionState};
 pub use transitions::{RouterTransitionPreset, RouterTransitionSpec};
 
-live_design! {
-    link widgets;
-    use link::theme::*;
-    use makepad_draw::shader::std::*;
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
 
-    DrawInspectorRect = {{DrawInspectorRect}} {
-        fn pixel(self) -> vec4 {
-            return self.color;
+    set_type_default() do #(DrawInspectorRect::script_shader(vm)){
+        ..mod.draw.DrawQuad
+    }
+
+    mod.widgets.DrawInspectorRect = {
+        pixel: fn() {
+            return self.color
         }
     }
 
-    pub RouterWidgetBase = {{RouterWidget}} {
+    mod.widgets.RouterWidgetBase = #(RouterWidget::register_widget(vm)) {
         flow: Overlay
         clip_x: true
         clip_y: true
 
         // Phase 3: transitions/animations (default off).
-        push_transition: none
-        pop_transition: none
-        replace_transition: none
+        push_transition: @none
+        pop_transition: @none
+        replace_transition: @none
         transition_duration: 0.25
         hero_transition: false
         debug_inspector: false
-        inspector_bg: {draw_depth: 10.0, color: #x00000012}
-        inspector_text: {
-            text_style: <THEME_FONT_REGULAR> {font_size: 9}
+        inspector_bg +: {draw_depth: 10.0, color: #x00000012}
+        inspector_text +: {
+            text_style: theme.font_regular{font_size: 9}
             color: #xFFFFFFFF
             draw_depth: 11.0
         }
@@ -73,12 +76,22 @@ live_design! {
         url_sync: true
         use_initial_url: false
     }
-    pub RouterWidget = <RouterWidgetBase> {
-        width: Fill, height: Fill
+
+    mod.widgets.RouterWidget = mod.widgets.RouterWidgetBase {
+        width: Fill
+        height: Fill
     }
 
-    pub Hero = {{Hero}} {
-        width: Fit, height: Fit
+    mod.widgets.RouterRouteBase = #(RouterRoute::register_widget(vm)) {
+        width: Fill
+        height: Fill
+    }
+
+    mod.widgets.RouterRoute = mod.widgets.RouterRouteBase {}
+
+    mod.widgets.Hero = #(Hero::register_widget(vm)) {
+        width: Fit
+        height: Fit
     }
 }
 
@@ -135,9 +148,40 @@ enum RouterNavRequest {
     },
 }
 
+/// Route entry wrapper that carries route metadata plus a page widget child.
+#[derive(Script, ScriptHook, Widget)]
+pub struct RouterRoute {
+    #[uid]
+    uid: WidgetUid,
+    #[source]
+    source: ScriptObjectRef,
+    #[deref]
+    view: View,
+    #[live]
+    route_pattern: String,
+    #[live]
+    route_transition: LiveId,
+    #[live(0.0)]
+    route_transition_duration: f64,
+}
+
+impl Widget for RouterRoute {
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+        self.view.handle_event(cx, event, scope);
+    }
+
+    fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
+        self.view.draw_walk(cx, scope, walk)
+    }
+}
+
 /// Router widget for managing navigation between pages
-#[derive(Live, LiveRegisterWidget, WidgetRef, WidgetSet)]
+#[derive(Script, WidgetRef, WidgetSet, WidgetRegister)]
 pub struct RouterWidget {
+    #[uid]
+    uid: WidgetUid,
+    #[source]
+    source: ScriptObjectRef,
     #[rust]
     area: Area,
     #[walk]
@@ -198,7 +242,7 @@ pub struct RouterWidget {
     caches: RouterCaches,
     #[rust]
     pointer_cleanup: PointerCleanup,
-    #[rust(RouterDrawLists::new(cx))]
+    #[new]
     draw_lists: RouterDrawLists,
     #[live]
     inspector_bg: DrawInspectorRect,
@@ -237,6 +281,10 @@ impl RouterWidget {
 }
 
 impl WidgetNode for RouterWidget {
+    fn widget_uid(&self) -> WidgetUid {
+        self.uid
+    }
+
     fn walk(&mut self, _cx: &mut Cx) -> Walk {
         self.walk
     }
@@ -245,89 +293,20 @@ impl WidgetNode for RouterWidget {
         self.area
     }
 
+    fn children(&self, visit: &mut dyn FnMut(LiveId, WidgetRef)) {
+        for (route_id, widget) in self.routes.widgets.iter() {
+            visit(*route_id, widget.clone());
+        }
+        for (route_id, child_router) in self.child_routers.iter() {
+            visit(*route_id, child_router.0.clone());
+        }
+    }
+
     fn redraw(&mut self, cx: &mut Cx) {
         self.draw_lists.from.redraw(cx);
         self.draw_lists.to.redraw(cx);
         self.draw_lists.inspector.redraw(cx);
         self.area.redraw(cx);
-    }
-
-    fn find_widgets(&self, path: &[LiveId], cached: WidgetCache, results: &mut WidgetSet) {
-        if path.is_empty() {
-            return;
-        }
-
-        // Fast-path: active route widget.
-        if path[0] == self.active_route {
-            if let Some(widget) = self.routes.widgets.get(&self.active_route) {
-                if path.len() == 1 {
-                    results.push(widget.clone());
-                } else {
-                    widget.find_widgets(&path[1..], cached, results);
-                }
-                return;
-            }
-        }
-
-        // Check route widgets
-        for (route_id, widget) in self.routes.widgets.iter() {
-            if path[0] == *route_id {
-                if path.len() == 1 {
-                    results.push(widget.clone());
-                } else {
-                    widget.find_widgets(&path[1..], cached, results);
-                }
-                return;
-            }
-        }
-
-        // Check child routers
-        for (route_id, child_router) in self.child_routers.iter() {
-            if path[0] == *route_id {
-                if let Some(child) = child_router.borrow() {
-                    child.find_widgets(&path[1..], cached, results);
-                }
-                return;
-            }
-        }
-
-        // Fallback: search all widgets
-        for widget in self.routes.widgets.values() {
-            widget.find_widgets(path, cached, results);
-        }
-    }
-
-    fn uid_to_widget(&self, uid: WidgetUid) -> WidgetRef {
-        // Fast-path: active route widget.
-        if let Some(active) = self.routes.widgets.get(&self.active_route) {
-            let result = active.uid_to_widget(uid);
-            if !result.is_empty() {
-                return result;
-            }
-        }
-
-        // Check route widgets
-        for (route_id, widget) in self.routes.widgets.iter() {
-            if *route_id == self.active_route {
-                continue;
-            }
-            let result = widget.uid_to_widget(uid);
-            if !result.is_empty() {
-                return result;
-            }
-        }
-
-        // Check child routers
-        for child_router in self.child_routers.values() {
-            if let Some(child) = child_router.borrow() {
-                let result = child.uid_to_widget(uid);
-                if !result.is_empty() {
-                    return result;
-                }
-            }
-        }
-
-        WidgetRef::empty()
     }
 }
 
@@ -400,7 +379,7 @@ impl Widget for RouterWidget {
     }
 }
 
-#[derive(Live, LiveHook, LiveRegister)]
+#[derive(Script, ScriptHook)]
 #[repr(C)]
 pub struct DrawInspectorRect {
     #[deref]
@@ -656,7 +635,7 @@ impl RouterWidgetRef {
         if let Some(param_value) = self.get_param_string(param_name) {
             let formatted_text = formatter(&param_value);
             self.with_active_route_widget(|route_widget| {
-                let label = route_widget.widget(&[label_id]);
+                let label = route_widget.widget(cx, &[label_id]);
                 if label.is_empty() {
                     return false;
                 }
@@ -694,7 +673,7 @@ impl RouterWidgetRef {
     ) -> bool {
         if self
             .with_active_route_widget(|route_widget| {
-                route_widget.button(&[button_id]).clicked(actions)
+                route_widget.button(cx, &[button_id]).clicked(actions)
             })
             .unwrap_or(false)
         {

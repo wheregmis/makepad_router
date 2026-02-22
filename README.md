@@ -4,7 +4,7 @@ A standalone routing package for Makepad applications, providing navigation, dee
 
 ## Features
 
-- **LiveId routes + DSL integration** (define routes directly in `live_design!`)
+- **LiveId routes + script DSL integration** (define routes directly in `script_mod!`)
 - **Path patterns** with params and wildcards (`/user/:id`, `/admin/*`, `/docs/**`)
 - **Navigation history** with back/forward semantics
 - **Query + hash support** per history entry
@@ -17,7 +17,7 @@ A standalone routing package for Makepad applications, providing navigation, dee
 
 ## RouterWidget Toggles
 
-These Live properties control optional subsystems. All default to behavior shown in the example app.
+These script properties control optional subsystems. All default to behavior shown in the example app.
 
 - `url_sync` (bool): sync route changes into browser URL/history on web builds.
 - `use_initial_url` (bool): apply the initial browser URL on startup (web only).
@@ -26,40 +26,66 @@ These Live properties control optional subsystems. All default to behavior shown
 - `debug_inspector` (bool): show a small overlay with route/stack/params.
 - `push_transition`, `pop_transition`, `replace_transition`, `transition_duration`: configure route transitions.
 
+Route metadata is configured on `RouterRoute` entries (`route_pattern`, `route_transition`, `route_transition_duration`), not directly on page widgets.
+
 ## Quick Start
 
 ```rust
 use makepad_widgets::*;
 use makepad_router::{RouterWidgetWidgetRefExt, RouterAction};
 
-live_design! {
-    use makepad_router::widget::*;
+app_main!(App);
 
-    App = {{App}} {
-        ui: <Window> {
-            router = <RouterWidget> {
-                width: Fill, height: Fill
-                default_route: home
-                not_found_route: not_found
+script_mod! {
+    use mod.prelude.widgets.*
 
-                home = <HomePage> { route_pattern: "/" }
-                settings = <SettingsPage> { route_pattern: "/settings/*" }
-                detail = <DetailPage> { route_pattern: "/detail/:id" }
-                not_found = <NotFoundPage> {}
+    startup() do #(App::script_component(vm)){
+        ui: Root{
+            main_window := Window{
+                router := RouterWidget{
+                    width: Fill
+                    height: Fill
+                    default_route: @home
+                    not_found_route: @not_found
+
+                    home := RouterRoute{
+                        route_pattern: "/"
+                        HomePage{}
+                    }
+                    settings := RouterRoute{
+                        route_pattern: "/settings/*"
+                        SettingsPage{}
+                    }
+                    detail := RouterRoute{
+                        route_pattern: "/detail/:id"
+                        DetailPage{}
+                    }
+                    not_found := RouterRoute{
+                        NotFoundPage{}
+                    }
+                }
             }
         }
     }
 }
 
+impl App {
+    fn run(vm: &mut ScriptVm) -> Self {
+        makepad_widgets::script_mod(vm);
+        makepad_router::script_mod(vm);
+        App::from_script_mod(vm, self::script_mod)
+    }
+}
+
 impl MatchEvent for App {
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
-        let router = self.ui.router_widget(ids!(router));
+        let router = self.ui.router_widget(cx, ids!(router));
 
-        if self.ui.button(ids!(home_btn)).clicked(actions) {
+        if self.ui.button(cx, ids!(home_btn)).clicked(actions) {
             router.navigate(cx, live_id!(home));
         }
 
-        if self.ui.button(ids!(back_btn)).clicked(actions) {
+        if self.ui.button(cx, ids!(back_btn)).clicked(actions) {
             router.back(cx);
         }
 

@@ -26,7 +26,6 @@ impl RouterWidget {
                     let dl = &mut cx.cx.cx.draw_lists[draw_list_id];
                     dl.draw_list_uniforms.view_shift = vec2(0.0, 0.0);
                     dl.draw_list_uniforms.view_transform = Mat4f::identity();
-                    dl.draw_list_uniforms.view_opacity = 0.0;
                 }
 
                 cx.global::<HeroGlobals>().set_phase(HeroPhase::CaptureFrom);
@@ -102,8 +101,6 @@ impl RouterWidget {
                 cx.global::<HeroGlobals>().set_phase(HeroPhase::Overlay);
 
                 let t = Self::ease_in_out(state.progress);
-                let from_opacity = (1.0 - t) as f32;
-                let to_opacity = t as f32;
 
                 let pairs = state.hero.pairs.clone();
                 let lerp = |a: f64, b: f64| a + (b - a) * t;
@@ -118,11 +115,10 @@ impl RouterWidget {
                     let dl = &mut cx.cx.cx.draw_lists[draw_list_id];
                     dl.draw_list_uniforms.view_shift = vec2(0.0, 0.0);
                     dl.draw_list_uniforms.view_transform = Mat4f::identity();
-                    dl.draw_list_uniforms.view_opacity = from_opacity;
                 }
                 for pair in &pairs {
                     let r = lerp_rect(pair.from_rect, pair.to_rect);
-                    let hero = self.uid_to_widget(pair.from_uid);
+                    let hero = cx.widget_tree().widget(pair.from_uid);
                     let _ = hero.draw_walk(cx, scope, Walk::abs_rect(r));
                 }
                 self.draw_lists.hero_from.end(cx);
@@ -133,11 +129,10 @@ impl RouterWidget {
                     let dl = &mut cx.cx.cx.draw_lists[draw_list_id];
                     dl.draw_list_uniforms.view_shift = vec2(0.0, 0.0);
                     dl.draw_list_uniforms.view_transform = Mat4f::identity();
-                    dl.draw_list_uniforms.view_opacity = to_opacity;
                 }
                 for pair in &pairs {
                     let r = lerp_rect(pair.from_rect, pair.to_rect);
-                    let hero = self.uid_to_widget(pair.to_uid);
+                    let hero = cx.widget_tree().widget(pair.to_uid);
                     let _ = hero.draw_walk(cx, scope, Walk::abs_rect(r));
                 }
                 self.draw_lists.hero_to.end(cx);

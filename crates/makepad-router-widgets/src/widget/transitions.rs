@@ -92,7 +92,6 @@ impl RouterTransitionState {
 pub(super) struct TransitionEffect {
     abs_pos: Vec2d,
     view_transform: Mat4f,
-    view_opacity: f32,
 }
 
 impl RouterWidget {
@@ -200,8 +199,6 @@ impl RouterWidget {
     ) -> TransitionEffect {
         let t = Self::ease_in_out(t);
 
-        let mut opacity_from = 1.0f32;
-        let mut opacity_to = 1.0f32;
         let mut pos_from = rect.pos;
         let mut pos_to = rect.pos;
         let mut transform_from = Mat4f::identity();
@@ -209,10 +206,7 @@ impl RouterWidget {
 
         match preset {
             RouterTransitionPreset::None => {}
-            RouterTransitionPreset::Fade => {
-                opacity_from = (1.0 - t) as f32;
-                opacity_to = t as f32;
-            }
+            RouterTransitionPreset::Fade => {}
             RouterTransitionPreset::SlideLeft => {
                 pos_from.x += -(rect.size.x * t);
                 pos_to.x += rect.size.x * (1.0 - t);
@@ -222,9 +216,6 @@ impl RouterWidget {
                 pos_to.x += -(rect.size.x * (1.0 - t));
             }
             RouterTransitionPreset::Scale => {
-                opacity_from = (1.0 - t) as f32;
-                opacity_to = t as f32;
-
                 let center_x = (rect.pos.x + rect.size.x * 0.5) as f32;
                 let center_y = (rect.pos.y + rect.size.y * 0.5) as f32;
                 let from_s = (1.0 - 0.05 * t) as f32;
@@ -245,9 +236,6 @@ impl RouterWidget {
                 );
             }
             RouterTransitionPreset::SharedAxis => {
-                opacity_from = (1.0 - t) as f32;
-                opacity_to = t as f32;
-
                 let dir = match direction {
                     RouterTransitionDirection::Forward => 1.0f32,
                     RouterTransitionDirection::Backward => -1.0f32,
@@ -276,16 +264,15 @@ impl RouterWidget {
             }
         }
 
-        let (abs_pos, view_transform, view_opacity) = if is_to {
-            (pos_to, transform_to, opacity_to)
+        let (abs_pos, view_transform) = if is_to {
+            (pos_to, transform_to)
         } else {
-            (pos_from, transform_from, opacity_from)
+            (pos_from, transform_from)
         };
 
         TransitionEffect {
             abs_pos,
             view_transform,
-            view_opacity,
         }
     }
 
@@ -311,7 +298,6 @@ impl RouterWidget {
             let dl = &mut cx.cx.cx.draw_lists[draw_list_id];
             dl.draw_list_uniforms.view_shift = vec2(0.0, 0.0);
             dl.draw_list_uniforms.view_transform = effect.view_transform;
-            dl.draw_list_uniforms.view_opacity = effect.view_opacity;
         }
 
         if let Some(widget) = route_widgets.get_mut(&route_id) {

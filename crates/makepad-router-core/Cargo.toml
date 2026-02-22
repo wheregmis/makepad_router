@@ -7,5 +7,5 @@ description = "Core routing types for Makepad"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-makepad-live-id = { git = "https://github.com/wheregmis/makepad.git", branch = "makepad_router", version = "1.0.0" }
-makepad-micro-serde = { git = "https://github.com/wheregmis/makepad.git", branch = "makepad_router", version = "1.0.0" }
+makepad-live-id = { path = "../../../makepad/libs/live_id" }
+makepad-micro-serde = { path = "../../../makepad/libs/micro_serde" }

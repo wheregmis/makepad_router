@@ -3,7 +3,7 @@ use crate::route::Route;
 use makepad_widgets::*;
 // Nested router discovery and child router registration.
 
-use super::{RouterWidget, RouterWidgetWidgetRefExt};
+use super::{RouterWidget, RouterWidgetRef, RouterWidgetWidgetRefExt};
 
 impl RouterWidget {
     pub(super) fn resolve_nested_prefix(
@@ -18,9 +18,13 @@ impl RouterWidget {
 
         let mut best: Option<(LiveId, RouteParams, RoutePatternRef, String, usize)> = None;
 
-        // Support lazy route widget instantiation by using the static Live-scanned child router paths
-        // as candidates, even before the child router widgets are fully instantiated.
-        for route_id in self.routes.child_router_paths.keys().cloned().chain(self.child_routers.keys().cloned()) {
+        for route_id in self
+            .routes
+            .patterns
+            .keys()
+            .cloned()
+            .chain(self.child_routers.keys().cloned())
+        {
             let Some(pattern_obj) = self.router.route_registry.get_pattern(route_id) else {
                 continue;
             };
@@ -64,81 +68,37 @@ impl RouterWidget {
 
     /// Automatically detect and register child routers in route widgets.
     ///
-    /// We scan the Live DSL for nested `RouterWidget` instances (and their widget-id paths) in
-    /// `apply_value_instance`, then resolve those paths against the instantiated route widgets here.
+    /// We scan the instantiated route widget tree for nested `RouterWidget` instances.
     pub(super) fn detect_child_routers(&mut self, _cx: &mut Cx) {
         for (route_id, route_widget) in self.routes.widgets.iter() {
             if self.child_routers.contains_key(route_id) {
                 continue;
             }
-            let Some(paths) = self.routes.child_router_paths.get(route_id) else {
-                continue;
-            };
-            for path in paths {
-                let child_widget = route_widget.widget(path);
-                if child_widget.borrow::<RouterWidget>().is_some() {
-                    let child_router = child_widget.as_router_widget();
-                    if let Some(mut inner) = child_router.borrow_mut() {
-                        inner.url_sync = false;
-                        inner.use_initial_url = false;
-                        inner.web.history_initialized = false;
-                    }
-                    self.child_routers.insert(*route_id, child_router);
-                    break;
+
+            if let Some(child_router) = Self::find_first_child_router(route_widget) {
+                if let Some(mut inner) = child_router.borrow_mut() {
+                    inner.url_sync = false;
+                    inner.use_initial_url = false;
+                    inner.web.history_initialized = false;
                 }
+                self.child_routers.insert(*route_id, child_router);
             }
         }
     }
 
-    pub(super) fn collect_child_router_paths(root_index: usize, nodes: &[LiveNode]) -> Vec<Vec<LiveId>> {
-        let router_live_type = LiveType::of::<RouterWidget>();
-        let mut out = Vec::new();
-        let mut path = Vec::<LiveId>::new();
-
-        let end = nodes.skip_node(root_index);
-        let mut i = root_index + 1;
-        while i < end {
-            i = Self::collect_child_router_paths_recur(i, nodes, router_live_type, &mut path, &mut out);
+    fn find_first_child_router(widget: &WidgetRef) -> Option<RouterWidgetRef> {
+        if widget.borrow::<RouterWidget>().is_some() {
+            return Some(widget.as_router_widget());
         }
-        out
-    }
 
-    fn collect_child_router_paths_recur(
-        index: usize,
-        nodes: &[LiveNode],
-        router_live_type: LiveType,
-        path: &mut Vec<LiveId>,
-        out: &mut Vec<Vec<LiveId>>,
-    ) -> usize {
-        let node = &nodes[index];
-
-        if node.origin.has_prop_type(LivePropType::Instance) {
-            if let LiveValue::Class { live_type, .. } = &node.value {
-                path.push(node.id);
-                if *live_type == router_live_type {
-                    out.push(path.clone());
-                }
-
-                let end = nodes.skip_node(index);
-                let mut i = index + 1;
-                while i < end {
-                    i = Self::collect_child_router_paths_recur(i, nodes, router_live_type, path, out);
-                }
-                path.pop();
-                return end;
+        let mut children = Vec::new();
+        widget.children(&mut |_id, child| children.push(child));
+        for child in children {
+            if let Some(found) = Self::find_first_child_router(&child) {
+                return Some(found);
             }
         }
-
-        if node.value.is_open() {
-            let end = nodes.skip_node(index);
-            let mut i = index + 1;
-            while i < end {
-                i = Self::collect_child_router_paths_recur(i, nodes, router_live_type, path, out);
-            }
-            return end;
-        }
-
-        index + 1
+        None
     }
 
     /// Navigate to a nested route.

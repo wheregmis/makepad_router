@@ -20,14 +20,13 @@ impl RouterWidget {
         });
     }
 
-    pub(super) fn flush_router_actions(&mut self, cx: &mut Cx, scope: &mut Scope) {
+    pub(super) fn flush_router_actions(&mut self, cx: &mut Cx, _scope: &mut Scope) {
         if self.pending_actions.is_empty() {
             return;
         }
         let uid = self.widget_uid();
         for action in self.pending_actions.drain(..) {
-            cx.widget_action(uid, &scope.path, action);
+            cx.widget_action(uid, action);
         }
     }
 }
-

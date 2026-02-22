@@ -8,11 +8,11 @@ pub use home::HomeController;
 pub use not_found::NotFoundController;
 pub use settings::SettingsController;
 
-use makepad_widgets::Cx;
+use makepad_widgets::ScriptVm;
 
-pub fn live_design(cx: &mut Cx) {
-    home::live_design(cx);
-    settings::live_design(cx);
-    detail::live_design(cx);
-    not_found::live_design(cx);
+pub fn script_mod(vm: &mut ScriptVm) {
+    home::script_mod(vm);
+    settings::script_mod(vm);
+    detail::script_mod(vm);
+    not_found::script_mod(vm);
 }

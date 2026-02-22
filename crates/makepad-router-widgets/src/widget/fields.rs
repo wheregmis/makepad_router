@@ -44,12 +44,11 @@ pub(crate) struct RouterCaches {
 
 #[derive(Default)]
 pub(crate) struct RouterRouteMaps {
-    pub(crate) templates: ComponentMap<LiveId, LivePtr>,
+    pub(crate) templates: ComponentMap<LiveId, ScriptObjectRef>,
     pub(crate) widgets: ComponentMap<LiveId, WidgetRef>,
     pub(crate) patterns: ComponentMap<LiveId, String>,
     pub(crate) transition_overrides: ComponentMap<LiveId, LiveId>,
     pub(crate) transition_duration_overrides: ComponentMap<LiveId, f64>,
-    pub(crate) child_router_paths: ComponentMap<LiveId, Vec<Vec<LiveId>>>,
 }
 
 #[derive(Default)]
@@ -79,6 +78,15 @@ impl RouterDrawLists {
         }
     }
 }
+
+impl ScriptNew for RouterDrawLists {
+    fn script_new(vm: &mut ScriptVm) -> Self {
+        Self::new(vm.cx_mut())
+    }
+}
+
+impl ScriptApply for RouterDrawLists {}
+impl ScriptHook for RouterDrawLists {}
 
 #[derive(Default)]
 pub(crate) struct TransitionRuntime {

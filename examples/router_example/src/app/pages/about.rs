@@ -1,33 +1,21 @@
 use makepad_router::RouterWidgetRef;
 use makepad_widgets::*;
 
-live_design! {
-    use link::widgets::*;
-    use link::theme_desktop_dark::*;
+script_mod! {
+    use mod.prelude.widgets.*
 
-    pub AboutPage = <View> {
-        width: Fill, height: Fill
-        show_bg: true
-        draw_bg: { color: #x533483 }
+    mod.widgets.AboutPage = View{
+        width: Fill
+        height: Fill
+        flow: Down
+        spacing: 16
+        padding: 32
 
-        flow: Down, spacing: 20, padding: 40
+        Label{text: "About" draw_text.text_style.font_size: 32}
+        Label{text: "This route is behind an async guard (native adds a small delay)."}
+        Label{text: "Router demo app"}
 
-        <Label> {
-            text: "About"
-            draw_text: { text_style: { font_size: 32 }, color: #xFFFFFF }
-        }
-
-        <Label> {
-            text: "This route is behind an async guard (native adds a small delay)."
-            draw_text: { text_style: { font_size: 14 }, color: #xAAAAAA }
-        }
-
-        <Label> {
-            text: "Router demo app"
-            draw_text: { text_style: { font_size: 16 }, color: #xAAAAAA }
-        }
-
-        home_btn = <Button> { text: "Back to Home" }
+        home_btn := Button{text: "Back to Home"}
     }
 }
 
@@ -37,7 +25,7 @@ pub struct AboutController;
 impl AboutController {
     pub fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions, router: &RouterWidgetRef) {
         let Some(to_home) =
-            router.with_active_route_widget(|w| w.button(&[live_id!(home_btn)]).clicked(actions))
+            router.with_active_route_widget(|w| w.button(cx, &[live_id!(home_btn)]).clicked(actions))
         else {
             return;
         };
@@ -46,4 +34,3 @@ impl AboutController {
         }
     }
 }
-

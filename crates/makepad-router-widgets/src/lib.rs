@@ -45,10 +45,10 @@ pub use crate::router::{Router, RouterAction};
 pub use crate::state::RouterState;
 pub use crate::url::{build_query_string, parse_query_map, RouterUrl};
 pub use crate::widget::{
-    RouterTransitionPreset, RouterTransitionSpec, RouterWidget, RouterWidgetRef,
+    RouterRoute, RouterTransitionPreset, RouterTransitionSpec, RouterWidget, RouterWidgetRef,
     RouterWidgetWidgetRefExt,
 };
-pub use crate::widget::live_design;
+pub use crate::widget::script_mod;
 
 /// Convenience re-exports for common usage patterns.
 pub mod prelude {
@@ -63,7 +63,7 @@ pub mod prelude {
     pub use crate::state::RouterState;
     pub use crate::url::RouterUrl;
     pub use crate::widget::{
-        RouterTransitionPreset, RouterTransitionSpec, RouterWidget, RouterWidgetRef,
+        RouterRoute, RouterTransitionPreset, RouterTransitionSpec, RouterWidget, RouterWidgetRef,
         RouterWidgetWidgetRefExt,
     };
 }
