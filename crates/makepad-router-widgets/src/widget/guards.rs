@@ -85,6 +85,9 @@ impl RouterWidget {
     }
 
     pub(super) fn before_leave_hooks_async(&self) -> &[RouterBeforeLeaveAsync] {
+        if !self.guards_async_enabled() {
+            return &[];
+        }
         &self.guards.before_leave_hooks_async
     }
 
@@ -96,6 +99,9 @@ impl RouterWidget {
     }
 
     pub(super) fn route_guards_async(&self) -> &[RouterAsyncGuard] {
+        if !self.guards_async_enabled() {
+            return &[];
+        }
         &self.guards.route_guards_async
     }
 }

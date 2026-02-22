@@ -19,6 +19,8 @@ impl ScriptHook for RouterWidget {
             self.caches.nested_prefix_cache_path.clear();
             self.caches.nested_prefix_cache_result = None;
             self.caches.url_parse_cache.clear();
+            self.caches.child_router_scan_epoch = 0;
+            self.caches.child_router_scan_widget_count = 0;
             self.routes.templates.clear();
             self.routes.patterns.clear();
             self.routes.transition_overrides.clear();
@@ -63,6 +65,7 @@ impl ScriptHook for RouterWidget {
                             } else {
                                 self.caches.route_registry_epoch =
                                     self.caches.route_registry_epoch.wrapping_add(1);
+                                self.caches.child_router_scan_widget_count = 0;
                             }
                         }
 

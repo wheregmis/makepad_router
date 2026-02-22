@@ -11,9 +11,12 @@ repository = "https://github.com/makepad/makepad/"
 [workspace]
 members = [
     "crates/makepad-router-core",
+    "crates/makepad-router-perf",
+    "crates/makepad-router-bench",
     "crates/makepad-router-widgets",
     "examples/router_example",
     "examples/router_advanced_example",
+    "examples/router_perf_probe",
 ]
 
 [dependencies]

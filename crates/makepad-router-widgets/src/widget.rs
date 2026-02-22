@@ -137,6 +137,22 @@ enum RouterNavRequest {
     PopToRoot,
 }
 
+#[derive(Clone, Debug)]
+pub(super) enum ResolvedPathKind {
+    FullMatch,
+    NestedPrefix { tail: String },
+    NotFoundFallback,
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct ResolvedPathIntent {
+    pub path: String,
+    pub route: Route,
+    pub kind: ResolvedPathKind,
+    pub clear_extras: bool,
+    pub replace: bool,
+}
+
 /// Route entry wrapper that carries route metadata plus a page widget child.
 #[derive(Script, ScriptHook, Widget)]
 pub struct RouterRoute {
@@ -266,6 +282,7 @@ impl RouterWidget {
         self.caches.nested_prefix_cache_epoch = 0;
         self.caches.nested_prefix_cache_path.clear();
         self.caches.nested_prefix_cache_result = None;
+        self.caches.child_router_scan_widget_count = 0;
         Ok(())
     }
 }

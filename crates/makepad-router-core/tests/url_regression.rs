@@ -1,4 +1,4 @@
-use makepad_router_core::url::{build_query_string, parse_query_map, RouterUrl};
+use makepad_router_core::url::{build_query_string, normalize_path_cow, parse_query_map, RouterUrl};
 use std::collections::HashMap;
 
 #[test]
@@ -35,4 +35,18 @@ fn query_map_decodes_and_builds() {
 
     let rebuilt = build_query_string(&map);
     assert_eq!(rebuilt, "?empty&flag&q=hello+world&x=%2F");
+}
+
+#[test]
+fn normalize_path_cow_borrows_when_possible() {
+    let borrowed = normalize_path_cow("/already/normalized");
+    assert!(matches!(borrowed, std::borrow::Cow::Borrowed(_)));
+    assert_eq!(borrowed.as_ref(), "/already/normalized");
+}
+
+#[test]
+fn normalize_path_cow_owns_when_rewrite_needed() {
+    let owned = normalize_path_cow("https://example.com/a/b/?q=1#x");
+    assert!(matches!(owned, std::borrow::Cow::Owned(_)));
+    assert_eq!(owned.as_ref(), "/a/b");
 }

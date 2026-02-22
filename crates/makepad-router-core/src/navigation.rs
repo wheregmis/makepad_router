@@ -130,6 +130,47 @@ impl NavigationHistory {
         self.current_index
     }
 
+    /// Preview the route selected by a `back()` operation without mutating history.
+    pub fn preview_back(&self) -> Option<&Route> {
+        if !self.can_go_back() {
+            return None;
+        }
+        self.stack.get(self.current_index - 1)
+    }
+
+    /// Preview the route selected by a `forward()` operation without mutating history.
+    pub fn preview_forward(&self) -> Option<&Route> {
+        if !self.can_go_forward() {
+            return None;
+        }
+        self.stack.get(self.current_index + 1)
+    }
+
+    /// Preview the route selected by a `pop()` operation without mutating history.
+    pub fn preview_pop(&self) -> Option<&Route> {
+        if self.stack.len() <= 1 {
+            return None;
+        }
+        self.stack.get(self.stack.len() - 2)
+    }
+
+    /// Preview the route selected by a `pop_to()` operation without mutating history.
+    pub fn preview_pop_to(&self, route_id: LiveId) -> Option<&Route> {
+        if self.current().map(|r| r.id) == Some(route_id) {
+            return None;
+        }
+        let pos = self.index.get(&route_id).and_then(|v| v.last().copied())?;
+        self.stack.get(pos)
+    }
+
+    /// Preview the route selected by a `pop_to_root()` operation without mutating history.
+    pub fn preview_pop_to_root(&self) -> Option<&Route> {
+        if self.stack.len() <= 1 {
+            return None;
+        }
+        self.stack.first()
+    }
+
     /// Split history into stack + current index (for persistence).
     pub fn into_parts(self) -> (Vec<Route>, usize) {
         (self.stack, self.current_index)

@@ -79,6 +79,11 @@ impl RouterWidget {
         if !self.nested_enabled() {
             return;
         }
+        if self.caches.child_router_scan_epoch == self.caches.route_registry_epoch
+            && self.caches.child_router_scan_widget_count == self.routes.widgets.len()
+        {
+            return;
+        }
         for (route_id, route_widget) in self.routes.widgets.iter() {
             if self.child_routers.contains_key(route_id) {
                 continue;
@@ -88,6 +93,8 @@ impl RouterWidget {
                 self.child_routers.insert(*route_id, child_router);
             }
         }
+        self.caches.child_router_scan_epoch = self.caches.route_registry_epoch;
+        self.caches.child_router_scan_widget_count = self.routes.widgets.len();
     }
 
     fn find_first_child_router(widget: &WidgetRef) -> Option<RouterWidgetRef> {

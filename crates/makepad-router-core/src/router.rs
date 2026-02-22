@@ -84,6 +84,31 @@ impl Router {
         self.current_route().map(|r| r.id)
     }
 
+    /// Preview the route selected by `back()` without mutating history.
+    pub fn preview_back_route(&self) -> Option<&Route> {
+        self.history.preview_back()
+    }
+
+    /// Preview the route selected by `forward()` without mutating history.
+    pub fn preview_forward_route(&self) -> Option<&Route> {
+        self.history.preview_forward()
+    }
+
+    /// Preview the route selected by `pop()` without mutating history.
+    pub fn preview_pop_route(&self) -> Option<&Route> {
+        self.history.preview_pop()
+    }
+
+    /// Preview the route selected by `pop_to()` without mutating history.
+    pub fn preview_pop_to_route(&self, route_id: LiveId) -> Option<&Route> {
+        self.history.preview_pop_to(route_id)
+    }
+
+    /// Preview the route selected by `pop_to_root()` without mutating history.
+    pub fn preview_pop_to_root_route(&self) -> Option<&Route> {
+        self.history.preview_pop_to_root()
+    }
+
     /// Check if we can navigate back
     pub fn can_go_back(&self) -> bool {
         self.history.can_go_back()

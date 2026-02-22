@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt;
 
@@ -70,35 +71,51 @@ impl fmt::Display for RouterUrl {
 /// Normalize a path or URL for matching (strip scheme/host, query/hash, ensure leading `/`,
 /// and collapse trailing slashes).
 pub fn normalize_path(input: &str) -> String {
-    let mut p = input.trim().to_string();
-    if p.is_empty() {
-        return "/".to_string();
+    normalize_path_cow(input).into_owned()
+}
+
+/// Borrowing variant of `normalize_path`.
+///
+/// Returns a borrowed slice whenever normalization can be represented as a subslice of `input`,
+/// avoiding an allocation in the common case where the input is already a normalized path.
+pub fn normalize_path_cow(input: &str) -> Cow<'_, str> {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        return Cow::Borrowed("/");
     }
-    // Accept full URLs too.
-    if let Some((_, after_scheme)) = p.split_once("://") {
-        let mut rest = after_scheme;
-        if let Some((_, after_host_slash)) = rest.split_once('/') {
-            rest = after_host_slash;
-            p = format!("/{}", rest);
+
+    let mut core = trimmed;
+    if let Some((_, after_scheme)) = trimmed.split_once("://") {
+        if let Some((_, after_host_slash)) = after_scheme.split_once('/') {
+            core = after_host_slash;
         } else {
-            p = "/".to_string();
+            return Cow::Borrowed("/");
         }
     }
-    if !p.starts_with('/') {
-        p.insert(0, '/');
+
+    if let Some(pos) = core.find(['?', '#']) {
+        core = &core[..pos];
     }
-    // Strip query/hash for matching.
-    if let Some((before_hash, _)) = p.split_once('#') {
-        p = before_hash.to_string();
+
+    if core.is_empty() {
+        return Cow::Borrowed("/");
     }
-    if let Some((before_q, _)) = p.split_once('?') {
-        p = before_q.to_string();
+
+    if core.starts_with('/') {
+        let mut end = core.len();
+        while end > 1 && core.as_bytes()[end - 1] == b'/' {
+            end -= 1;
+        }
+        return Cow::Borrowed(&core[..end]);
     }
-    // Collapse trailing slashes.
-    while p.len() > 1 && p.ends_with('/') {
-        p.pop();
+
+    let mut out = String::with_capacity(core.len() + 1);
+    out.push('/');
+    out.push_str(core);
+    while out.len() > 1 && out.ends_with('/') {
+        out.pop();
     }
-    p
+    Cow::Owned(out)
 }
 
 /// Parse a query string (`?a=1&b=2`) into a string map.

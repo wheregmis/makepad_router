@@ -12,6 +12,42 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
 
+fn next_non_empty_segment<'a>(segments: &mut std::str::Split<'a, char>) -> Option<&'a str> {
+    while let Some(seg) = segments.next() {
+        if !seg.is_empty() {
+            return Some(seg);
+        }
+    }
+    None
+}
+
+fn collect_tail(
+    first: Option<&str>,
+    segments: &mut std::str::Split<'_, char>,
+) -> String {
+    let mut out = String::new();
+    let push_segment = |segment: &str, out: &mut String| {
+        if out.is_empty() {
+            out.push('/');
+        } else {
+            out.push('/');
+        }
+        out.push_str(segment);
+    };
+
+    if let Some(first) = first {
+        if !first.is_empty() {
+            push_segment(first, &mut out);
+        }
+    }
+
+    while let Some(seg) = next_non_empty_segment(segments) {
+        push_segment(seg, &mut out);
+    }
+
+    out
+}
+
 /// Represents a route segment type in a pattern
 #[derive(Clone, Debug, PartialEq, Eq, Hash, SerBin, DeBin, SerRon, DeRon)]
 pub enum RouteSegment {
@@ -139,31 +175,31 @@ impl RoutePattern {
         let path = path.trim();
         // Normalize: ensure it starts with /
         let path = path.strip_prefix('/').unwrap_or(path);
-
-        let path_segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
         let mut params = RouteParams::new();
-        let mut pattern_idx = 0;
-        let mut path_idx = 0;
 
-        while pattern_idx < self.segments.len() && path_idx < path_segments.len() {
-            match &self.segments[pattern_idx] {
+        let mut path_segments = path.split('/');
+        for segment in &self.segments {
+            match segment {
                 RouteSegment::Static(expected) => {
-                    if path_segments[path_idx] != expected {
+                    let Some(actual) = next_non_empty_segment(&mut path_segments) else {
+                        return None;
+                    };
+                    if actual != expected {
                         return None;
                     }
-                    path_idx += 1;
                 }
                 RouteSegment::Dynamic { key, .. } => {
-                    let value = path_segments[path_idx];
+                    let Some(value) = next_non_empty_segment(&mut path_segments) else {
+                        return None;
+                    };
                     // Use from_str_with_intern to store the string so it can be retrieved later
                     use makepad_live_id::InternLiveId;
                     let param_value = LiveId::from_str_with_intern(value, InternLiveId::Yes);
                     params.add(*key, param_value);
-                    path_idx += 1;
                 }
                 RouteSegment::WildcardSingle => {
                     // Match exactly one segment
-                    path_idx += 1;
+                    next_non_empty_segment(&mut path_segments)?;
                 }
                 RouteSegment::WildcardMulti => {
                     // Match remaining segments (zero or more)
@@ -171,21 +207,9 @@ impl RoutePattern {
                     return Some(params);
                 }
             }
-            pattern_idx += 1;
         }
 
-        // Check if we consumed all segments
-        if pattern_idx < self.segments.len() {
-            // Check if remaining is just a multi-segment wildcard
-            if pattern_idx == self.segments.len() - 1 {
-                if let RouteSegment::WildcardMulti = self.segments[pattern_idx] {
-                    return Some(params);
-                }
-            }
-            return None;
-        }
-
-        if path_idx < path_segments.len() {
+        if next_non_empty_segment(&mut path_segments).is_some() {
             // Path has more segments than pattern
             return None;
         }
@@ -205,73 +229,56 @@ impl RoutePattern {
     pub fn matches_prefix_with_tail(&self, path: &str) -> Option<(RouteParams, String)> {
         let path = path.trim();
         let path = path.strip_prefix('/').unwrap_or(path);
-        let path_segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+        let mut path_segments = path.split('/');
 
         let mut params = RouteParams::new();
-        let mut pattern_idx = 0usize;
-        let mut path_idx = 0usize;
-        let mut tail_start_at: Option<usize> = None;
+        let mut tail: Option<String> = None;
+        let last_idx = self.segments.len().saturating_sub(1);
 
-        while pattern_idx < self.segments.len() && path_idx < path_segments.len() {
-            match &self.segments[pattern_idx] {
+        for (pattern_idx, segment) in self.segments.iter().enumerate() {
+            match segment {
                 RouteSegment::Static(expected) => {
-                    if path_segments[path_idx] != expected {
+                    let Some(actual) = next_non_empty_segment(&mut path_segments) else {
+                        return None;
+                    };
+                    if actual != expected {
                         return None;
                     }
-                    path_idx += 1;
                 }
                 RouteSegment::Dynamic { key, .. } => {
-                    let value = path_segments[path_idx];
+                    let Some(value) = next_non_empty_segment(&mut path_segments) else {
+                        return None;
+                    };
                     use makepad_live_id::InternLiveId;
                     let param_value = LiveId::from_str_with_intern(value, InternLiveId::Yes);
                     params.add(*key, param_value);
-                    path_idx += 1;
                 }
                 RouteSegment::WildcardSingle => {
-                    // For nested routing we only "capture" a trailing wildcard, otherwise it's just a matcher.
-                    if pattern_idx == self.segments.len().saturating_sub(1) {
-                        tail_start_at = Some(path_idx);
+                    let matched = next_non_empty_segment(&mut path_segments)?;
+                    // For nested routing we capture the tail if wildcard is trailing.
+                    if pattern_idx == last_idx {
+                        tail = Some(collect_tail(Some(matched), &mut path_segments));
                     }
-                    path_idx += 1;
                 }
                 RouteSegment::WildcardMulti => {
                     // Must be last (enforced by parser). Capture the rest (could be empty).
-                    tail_start_at = Some(path_idx);
-                    path_idx = path_segments.len();
-                    pattern_idx += 1;
-                    break;
+                    tail = Some(collect_tail(
+                        next_non_empty_segment(&mut path_segments),
+                        &mut path_segments,
+                    ));
+                    return Some((params, tail.unwrap_or_default()));
                 }
             }
-            pattern_idx += 1;
         }
 
-        // If we did not consume the whole pattern, only a trailing `**` can match an empty remainder.
-        if pattern_idx < self.segments.len() {
-            if pattern_idx == self.segments.len() - 1
-                && matches!(self.segments[pattern_idx], RouteSegment::WildcardMulti)
-            {
-                tail_start_at = Some(path_idx);
-            } else {
-                return None;
-            }
+        if tail.is_none() {
+            tail = Some(collect_tail(
+                next_non_empty_segment(&mut path_segments),
+                &mut path_segments,
+            ));
         }
 
-        // If the pattern is fully matched but the path has more segments, this is prefix-match tail.
-        if tail_start_at.is_none() && path_idx < path_segments.len() {
-            tail_start_at = Some(path_idx);
-        }
-
-        let tail = if let Some(start) = tail_start_at {
-            if start >= path_segments.len() {
-                String::new()
-            } else {
-                format!("/{}", path_segments[start..].join("/"))
-            }
-        } else {
-            String::new()
-        };
-
-        Some((params, tail))
+        Some((params, tail.unwrap_or_default()))
     }
 
     /// Get the priority for route matching (lower = higher priority)
@@ -597,6 +604,15 @@ mod tests {
     }
 
     #[test]
+    fn test_pattern_prefix_tail_wildcard_single_includes_extra_suffix() {
+        let pattern = RoutePattern::parse("/admin/*").unwrap();
+        let (_params, tail) = pattern
+            .matches_prefix_with_tail("/admin/dashboard/details")
+            .unwrap();
+        assert_eq!(tail, "/dashboard/details");
+    }
+
+    #[test]
     fn test_pattern_prefix_tail_wildcard_multi() {
         let pattern = RoutePattern::parse("/admin/**").unwrap();
         let (_params, tail) = pattern.matches_prefix_with_tail("/admin/a/b").unwrap();
@@ -614,6 +630,13 @@ mod tests {
             Some(LiveId::from_str("42"))
         );
         assert_eq!(tail, "/profile/settings");
+    }
+
+    #[test]
+    fn test_pattern_prefix_tail_non_trailing_wildcard_keeps_remainder() {
+        let pattern = RoutePattern::parse("/a/*/c").unwrap();
+        let (_params, tail) = pattern.matches_prefix_with_tail("/a/x/c/d").unwrap();
+        assert_eq!(tail, "/d");
     }
 
     #[test]

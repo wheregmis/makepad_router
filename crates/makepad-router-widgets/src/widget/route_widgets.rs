@@ -21,5 +21,6 @@ impl RouterWidget {
         self.routes.widgets.get_or_insert(cx, route_id, |cx| {
             Self::new_route_widget_from_template(cx, template)
         });
+        self.caches.child_router_scan_widget_count = 0;
     }
 }

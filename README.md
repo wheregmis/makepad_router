@@ -187,6 +187,28 @@ Advanced example focus:
 - sync/async guards (allow/block/redirect)
 - stack commands (`SetStack`, `Pop`, `PopTo`, `PopToRoot`, `ReplaceRoute`)
 
+## Performance Workflow
+
+Native benchmark suite (criterion):
+
+```
+cargo bench -p makepad-router-bench --bench router_perf
+```
+
+Local regression check with baseline snapshot:
+
+```
+scripts/perf_check.sh
+```
+
+Perf probe output (JSON p50/p95/p99/mean, same shared scenarios):
+
+```
+cargo run -p router_perf_probe --release
+```
+
+More details: `docs/performance.md`
+
 ## Architecture
 
 Key components in `src/`:

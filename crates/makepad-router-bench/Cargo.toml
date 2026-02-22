@@ -1,0 +1,19 @@
+[package]
+name = "makepad-router-bench"
+version = "0.1.0"
+edition = "2021"
+authors = ["Makepad <info@makepad.nl>"]
+description = "Benchmark suite for makepad-router"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+makepad-router-core = { path = "../makepad-router-core" }
+makepad-router-perf = { path = "../makepad-router-perf" }
+makepad-live-id = { path = "../../../makepad/libs/live_id" }
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "router_perf"
+harness = false

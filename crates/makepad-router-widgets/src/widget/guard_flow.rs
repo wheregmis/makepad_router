@@ -5,11 +5,11 @@ use crate::{
         RouterAsyncDecision, RouterBeforeLeaveDecision, RouterGuardDecision, RouterNavContext,
         RouterNavKind, RouterRedirectTarget,
     },
-    route::{Route, RouteQuery},
+    route::Route,
 };
 use makepad_widgets::*;
 
-use super::{RouterBlockReason, RouterNavRequest, RouterWidget};
+use super::{ResolvedPathIntent, RouterBlockReason, RouterNavRequest, RouterWidget};
 
 pub(super) const ROUTER_MAX_REDIRECTS: u8 = 8;
 
@@ -26,6 +26,8 @@ enum PendingAsyncRx {
 
 pub(super) struct PendingNavigation {
     request: RouterNavRequest,
+    context: RouterNavContext,
+    resolved_path: Option<ResolvedPathIntent>,
     phase: PendingNavPhase,
     async_index: usize,
     redirect_depth: u8,
@@ -51,10 +53,19 @@ impl RouterWidget {
             self.last_blocked_reason = Some(RouterBlockReason::NoHistory);
             return false;
         }
-        let Some((context, leaving)) = self.resolve_nav_context(cx, &request) else {
+        let Some((context, leaving, resolved_path)) = self.resolve_nav_context(cx, &request) else {
             self.last_blocked_reason = Some(Self::infer_resolution_block_reason(&request));
             return false;
         };
+
+        if !skip_before_leave
+            && self.before_leave_hooks().is_empty()
+            && !self.has_async_before_leave_hooks()
+            && self.route_guards().is_empty()
+            && !self.has_async_route_guards()
+        {
+            return self.apply_request_bypassing_guards_resolved(cx, request, resolved_path);
+        }
 
         if !skip_before_leave && leaving {
             for hook in self.before_leave_hooks() {
@@ -64,22 +75,30 @@ impl RouterWidget {
                 }
             }
             if self.has_async_before_leave_hooks() {
-                return self.run_before_leave_async(cx, request, context, 0, redirect_depth);
+                return self.run_before_leave_async(
+                    cx,
+                    request,
+                    context,
+                    resolved_path,
+                    0,
+                    redirect_depth,
+                );
             }
         }
 
-        self.apply_guards_and_maybe_commit(cx, request, context, redirect_depth)
+        self.apply_guards_and_maybe_commit(cx, request, context, resolved_path, redirect_depth)
     }
 
     fn resolve_nav_context(
         &mut self,
-        cx: &mut Cx,
+        _cx: &mut Cx,
         request: &RouterNavRequest,
-    ) -> Option<(RouterNavContext, bool)> {
+    ) -> Option<(RouterNavContext, bool, Option<ResolvedPathIntent>)> {
         let from = self.router.current_route().cloned();
         let kind = Self::request_kind(request);
-        let mut to: Option<Route> = None;
+        let to: Option<Route>;
         let mut to_path: Option<String> = None;
+        let mut resolved_path: Option<ResolvedPathIntent> = None;
 
         match request {
             RouterNavRequest::Navigate { route_id }
@@ -93,74 +112,27 @@ impl RouterWidget {
             }
             RouterNavRequest::NavigateByPath { path }
             | RouterNavRequest::ReplaceByPath { path, .. } => {
-                self.detect_child_routers(cx);
-                let parsed = self.parse_url_cached(path);
-                let query = RouteQuery::from_query_string(&parsed.query);
-                let hash = parsed.hash.clone();
-                let path = parsed.path;
-                to_path = Some(path.clone());
-
-                if let Some(mut route) = self.router.route_registry.resolve_path(&path) {
-                    if self.routes.templates.contains_key(&route.id) {
-                        route.query = query.clone();
-                        route.hash = hash.clone();
-                        to = Some(route);
-                    } else {
-                        return None;
-                    }
-                } else if let Some((route_id, params, pattern, _tail)) =
-                    self.resolve_nested_prefix(&path)
-                {
-                    if self.routes.templates.contains_key(&route_id) {
-                        to = Some(Route {
-                            id: route_id,
-                            params,
-                            query: query.clone(),
-                            hash: hash.clone(),
-                            pattern: Some(pattern),
-                        });
-                    } else {
-                        return None;
-                    }
-                } else if self.not_found_route.0 != 0
-                    && self.routes.templates.contains_key(&self.not_found_route)
-                {
-                    match request {
-                        RouterNavRequest::NavigateByPath { .. } => {
-                            if self.current_route_id() != Some(self.not_found_route) {
-                                let mut nf = Route::new(self.not_found_route);
-                                nf.query = query.clone();
-                                nf.hash = hash.clone();
-                                to = Some(nf);
-                            } else {
-                                return None;
-                            }
-                        }
-                        RouterNavRequest::ReplaceByPath { .. } => {
-                            let mut nf = Route::new(self.not_found_route);
-                            nf.query = query.clone();
-                            nf.hash = hash.clone();
-                            to = Some(nf);
-                        }
-                        _ => {}
-                    }
-                } else {
-                    return None;
-                }
+                let (replace, clear_extras) = match request {
+                    RouterNavRequest::NavigateByPath { .. } => (false, true),
+                    RouterNavRequest::ReplaceByPath { clear_extras, .. } => (true, *clear_extras),
+                    _ => (false, true),
+                };
+                let intent = self.resolve_path_intent(path, replace, clear_extras)?;
+                to_path = Some(intent.path.clone());
+                to = Some(intent.route.clone());
+                resolved_path = Some(intent);
             }
             RouterNavRequest::Back { .. } => {
-                let mut preview = self.router.clone();
-                if !preview.back() {
+                let Some(next) = self.router.preview_back_route() else {
                     return None;
-                }
-                to = preview.current_route().cloned();
+                };
+                to = Some(next.clone());
             }
             RouterNavRequest::Forward { .. } => {
-                let mut preview = self.router.clone();
-                if !preview.forward() {
+                let Some(next) = self.router.preview_forward_route() else {
                     return None;
-                }
-                to = preview.current_route().cloned();
+                };
+                to = Some(next.clone());
             }
             RouterNavRequest::Reset { route } => {
                 if !self.routes.templates.contains_key(&route.id) {
@@ -180,25 +152,22 @@ impl RouterWidget {
                 to = filtered.last().cloned();
             }
             RouterNavRequest::Pop => {
-                let mut preview = self.router.clone();
-                if !preview.pop() {
+                let Some(next) = self.router.preview_pop_route() else {
                     return None;
-                }
-                to = preview.current_route().cloned();
+                };
+                to = Some(next.clone());
             }
             RouterNavRequest::PopTo { route_id } => {
-                let mut preview = self.router.clone();
-                if !preview.pop_to(*route_id) {
+                let Some(next) = self.router.preview_pop_to_route(*route_id) else {
                     return None;
-                }
-                to = preview.current_route().cloned();
+                };
+                to = Some(next.clone());
             }
             RouterNavRequest::PopToRoot => {
-                let mut preview = self.router.clone();
-                if !preview.pop_to_root() {
+                let Some(next) = self.router.preview_pop_to_root_route() else {
                     return None;
-                }
-                to = preview.current_route().cloned();
+                };
+                to = Some(next.clone());
             }
         }
 
@@ -216,6 +185,7 @@ impl RouterWidget {
                 to_path,
             },
             leaving,
+            resolved_path,
         ))
     }
 
@@ -244,6 +214,7 @@ impl RouterWidget {
         cx: &mut Cx,
         mut request: RouterNavRequest,
         mut context: RouterNavContext,
+        mut resolved_path: Option<ResolvedPathIntent>,
         mut redirect_depth: u8,
     ) -> bool {
         loop {
@@ -263,10 +234,13 @@ impl RouterWidget {
                         }
                         redirect_depth += 1;
                         request = Self::redirect_to_request(redirect.target, redirect.replace);
-                        let Some((next_context, _)) = self.resolve_nav_context(cx, &request) else {
+                        let Some((next_context, _, next_resolved_path)) =
+                            self.resolve_nav_context(cx, &request)
+                        else {
                             return false;
                         };
                         context = next_context;
+                        resolved_path = next_resolved_path;
                         redirected = Some(());
                         break;
                     }
@@ -277,10 +251,17 @@ impl RouterWidget {
             }
 
             if self.has_async_route_guards() {
-                return self.run_guard_async(cx, request, context, 0, redirect_depth);
+                return self.run_guard_async(
+                    cx,
+                    request,
+                    context,
+                    resolved_path,
+                    0,
+                    redirect_depth,
+                );
             }
 
-            return self.apply_request_bypassing_guards(cx, request);
+            return self.apply_request_bypassing_guards_resolved(cx, request, resolved_path);
         }
     }
 
@@ -289,6 +270,7 @@ impl RouterWidget {
         cx: &mut Cx,
         request: RouterNavRequest,
         context: RouterNavContext,
+        resolved_path: Option<ResolvedPathIntent>,
         start_index: usize,
         redirect_depth: u8,
     ) -> bool {
@@ -306,6 +288,8 @@ impl RouterWidget {
                 RouterAsyncDecision::Pending(rx) => {
                     self.pending_navigation = Some(PendingNavigation {
                         request,
+                        context,
+                        resolved_path,
                         phase: PendingNavPhase::BeforeLeaveAsync,
                         async_index: idx,
                         redirect_depth,
@@ -316,7 +300,7 @@ impl RouterWidget {
             }
         }
 
-        self.apply_guards_and_maybe_commit(cx, request, context, redirect_depth)
+        self.apply_guards_and_maybe_commit(cx, request, context, resolved_path, redirect_depth)
     }
 
     fn run_guard_async(
@@ -324,6 +308,7 @@ impl RouterWidget {
         cx: &mut Cx,
         request: RouterNavRequest,
         context: RouterNavContext,
+        resolved_path: Option<ResolvedPathIntent>,
         start_index: usize,
         redirect_depth: u8,
     ) -> bool {
@@ -353,6 +338,8 @@ impl RouterWidget {
                 RouterAsyncDecision::Pending(rx) => {
                     self.pending_navigation = Some(PendingNavigation {
                         request,
+                        context,
+                        resolved_path,
                         phase: PendingNavPhase::GuardAsync,
                         async_index: idx,
                         redirect_depth,
@@ -363,7 +350,7 @@ impl RouterWidget {
             }
         }
 
-        self.apply_request_bypassing_guards(cx, request)
+        self.apply_request_bypassing_guards_resolved(cx, request, resolved_path)
     }
 
     fn redirect_to_request(target: RouterRedirectTarget, replace: bool) -> RouterNavRequest {
@@ -381,6 +368,15 @@ impl RouterWidget {
     }
 
     fn apply_request_bypassing_guards(&mut self, cx: &mut Cx, request: RouterNavRequest) -> bool {
+        self.apply_request_bypassing_guards_resolved(cx, request, None)
+    }
+
+    fn apply_request_bypassing_guards_resolved(
+        &mut self,
+        cx: &mut Cx,
+        request: RouterNavRequest,
+        resolved_path: Option<ResolvedPathIntent>,
+    ) -> bool {
         let prev = self.guard_bypass;
         self.guard_bypass = true;
         let out = match request {
@@ -394,10 +390,14 @@ impl RouterWidget {
                 route_id,
                 transition,
             } => self.replace_with_transition(cx, route_id, transition),
-            RouterNavRequest::NavigateByPath { path } => self.navigate_by_path(cx, &path),
-            RouterNavRequest::ReplaceByPath { path, clear_extras } => {
-                self.replace_by_path_internal(cx, &path, clear_extras)
-            }
+            RouterNavRequest::NavigateByPath { path } => match resolved_path.as_ref() {
+                Some(intent) => self.apply_resolved_path_intent(cx, intent),
+                None => self.navigate_by_path(cx, &path),
+            },
+            RouterNavRequest::ReplaceByPath { path, clear_extras } => match resolved_path.as_ref() {
+                Some(intent) => self.apply_resolved_path_intent(cx, intent),
+                None => self.replace_by_path_internal(cx, &path, clear_extras),
+            },
             RouterNavRequest::Back { transition } => match transition {
                 Some(t) => self.back_with_transition(cx, t),
                 None => self.back(cx),
@@ -435,6 +435,8 @@ impl RouterWidget {
         match pending {
             PendingNavigation {
                 request,
+                context,
+                resolved_path,
                 phase: PendingNavPhase::BeforeLeaveAsync,
                 async_index,
                 redirect_depth,
@@ -445,6 +447,8 @@ impl RouterWidget {
                     Err(std::sync::mpsc::TryRecvError::Empty) => {
                         self.pending_navigation = Some(PendingNavigation {
                             request,
+                            context,
+                            resolved_path,
                             phase: PendingNavPhase::BeforeLeaveAsync,
                             async_index,
                             redirect_depth,
@@ -459,19 +463,19 @@ impl RouterWidget {
                     self.last_blocked_reason = Some(RouterBlockReason::BeforeLeaveBlocked);
                     return;
                 }
-                let Some((context, _)) = self.resolve_nav_context(cx, &request) else {
-                    return;
-                };
                 let _ = self.run_before_leave_async(
                     cx,
                     request,
                     context,
+                    resolved_path,
                     async_index + 1,
                     redirect_depth,
                 );
             }
             PendingNavigation {
                 request,
+                context,
+                resolved_path,
                 phase: PendingNavPhase::GuardAsync,
                 async_index,
                 redirect_depth,
@@ -482,6 +486,8 @@ impl RouterWidget {
                     Err(std::sync::mpsc::TryRecvError::Empty) => {
                         self.pending_navigation = Some(PendingNavigation {
                             request,
+                            context,
+                            resolved_path,
                             phase: PendingNavPhase::GuardAsync,
                             async_index,
                             redirect_depth,
@@ -494,13 +500,11 @@ impl RouterWidget {
 
                 match decision {
                     RouterGuardDecision::Allow => {
-                        let Some((context, _)) = self.resolve_nav_context(cx, &request) else {
-                            return;
-                        };
                         let _ = self.run_guard_async(
                             cx,
                             request,
                             context,
+                            resolved_path,
                             async_index + 1,
                             redirect_depth,
                         );

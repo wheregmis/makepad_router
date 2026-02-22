@@ -1,0 +1,11 @@
+[package]
+name = "makepad-router-perf"
+version = "0.1.0"
+edition = "2021"
+authors = ["Makepad <info@makepad.nl>"]
+description = "Shared performance scenarios for makepad-router"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+makepad-router-core = { path = "../makepad-router-core" }
+makepad-live-id = { path = "../../../makepad/libs/live_id" }

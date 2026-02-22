@@ -3,6 +3,7 @@ use crate::{
     url::RouterUrl,
 };
 use makepad_widgets::*;
+use std::collections::HashMap;
 
 use super::RouterTransitionState;
 use crate::guards::{
@@ -26,12 +27,74 @@ pub(crate) struct RouterGuards {
 }
 
 #[derive(Default)]
+pub(crate) struct RouterUrlCache {
+    index: HashMap<String, usize>,
+    slots: Vec<Option<(String, RouterUrl)>>,
+    next_slot: usize,
+}
+
+impl RouterUrlCache {
+    const MAX: usize = 16;
+
+    pub(crate) fn get(&self, key: &str) -> Option<RouterUrl> {
+        let idx = *self.index.get(key)?;
+        let slot = self.slots.get(idx)?.as_ref()?;
+        if slot.0 == key {
+            Some(slot.1.clone())
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn insert(&mut self, key: String, value: RouterUrl) {
+        if self.slots.len() < Self::MAX {
+            self.slots.resize_with(Self::MAX, || None);
+        }
+
+        if let Some(&idx) = self.index.get(key.as_str()) {
+            self.slots[idx] = Some((key, value));
+            return;
+        }
+
+        let idx = self.next_slot;
+        self.next_slot = (self.next_slot + 1) % Self::MAX;
+
+        if let Some((old_key, _)) = self.slots[idx].take() {
+            self.index.remove(&old_key);
+        }
+        self.index.insert(key.clone(), idx);
+        self.slots[idx] = Some((key, value));
+    }
+
+    pub(crate) fn clear(&mut self) {
+        self.index.clear();
+        self.slots.clear();
+        self.next_slot = 0;
+    }
+}
+
 pub(crate) struct RouterCaches {
     pub(crate) route_registry_epoch: u64,
     pub(crate) nested_prefix_cache_epoch: u64,
     pub(crate) nested_prefix_cache_path: String,
     pub(crate) nested_prefix_cache_result: Option<(LiveId, RouteParams, RoutePatternRef, String)>,
-    pub(crate) url_parse_cache: Vec<(String, RouterUrl)>,
+    pub(crate) url_parse_cache: RouterUrlCache,
+    pub(crate) child_router_scan_epoch: u64,
+    pub(crate) child_router_scan_widget_count: usize,
+}
+
+impl Default for RouterCaches {
+    fn default() -> Self {
+        Self {
+            route_registry_epoch: 0,
+            nested_prefix_cache_epoch: 0,
+            nested_prefix_cache_path: String::new(),
+            nested_prefix_cache_result: None,
+            url_parse_cache: RouterUrlCache::default(),
+            child_router_scan_epoch: 0,
+            child_router_scan_widget_count: 0,
+        }
+    }
 }
 
 #[derive(Default)]
