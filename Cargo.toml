@@ -13,6 +13,7 @@ members = [
     "crates/makepad-router-core",
     "crates/makepad-router-widgets",
     "examples/router_example",
+    "examples/router_advanced_example",
 ]
 
 [dependencies]

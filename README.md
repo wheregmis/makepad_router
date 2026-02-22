@@ -163,19 +163,29 @@ let _ = router.add_before_leave_hook(|_cx, nav| {
 });
 ```
 
-## Example App
+## Example Apps
 
-Run the example app:
+Start here (simple, dead-end-free):
 
 ```
 cargo run -p router_example
 ```
 
-Routes in the example:
+Simple example routes:
 - `/` (home)
-- `/settings/*` (nested router)
-- `/detail/:id` (param)
+- `/settings/*` (small nested router)
+- `/detail/:id` (param route)
 - `not_found` (catch-all)
+
+Next step (advanced guards + stack operations):
+
+```
+cargo run -p router_advanced_example
+```
+
+Advanced example focus:
+- sync/async guards (allow/block/redirect)
+- stack commands (`SetStack`, `Pop`, `PopTo`, `PopToRoot`, `ReplaceRoute`)
 
 ## Architecture
 
