@@ -363,10 +363,9 @@ impl RouteParams {
     /// Get a parameter value by key
     pub fn get(&self, key: LiveId) -> Option<LiveId> {
         match &self.data {
-            RouteParamStore::Small(entries) => entries
-                .iter()
-                .find(|(k, _)| *k == key)
-                .map(|(_, v)| *v),
+            RouteParamStore::Small(entries) => {
+                entries.iter().find(|(k, _)| *k == key).map(|(_, v)| *v)
+            }
             RouteParamStore::Map(map) => map.get(&key).copied(),
         }
     }
@@ -491,7 +490,9 @@ mod tests {
         let pattern = RoutePattern::parse("/user/:id").unwrap();
         assert_eq!(pattern.segments.len(), 2);
         assert!(matches!(pattern.segments[0], RouteSegment::Static(ref s) if s == "user"));
-        assert!(matches!(pattern.segments[1], RouteSegment::Dynamic { ref name, .. } if name == "id"));
+        assert!(
+            matches!(pattern.segments[1], RouteSegment::Dynamic { ref name, .. } if name == "id")
+        );
     }
 
     #[test]
@@ -515,7 +516,9 @@ mod tests {
         let pattern = RoutePattern::parse("/user/:id/posts/*").unwrap();
         assert_eq!(pattern.segments.len(), 4);
         assert!(matches!(pattern.segments[0], RouteSegment::Static(ref s) if s == "user"));
-        assert!(matches!(pattern.segments[1], RouteSegment::Dynamic { ref name, .. } if name == "id"));
+        assert!(
+            matches!(pattern.segments[1], RouteSegment::Dynamic { ref name, .. } if name == "id")
+        );
         assert!(matches!(pattern.segments[2], RouteSegment::Static(ref s) if s == "posts"));
         assert!(matches!(pattern.segments[3], RouteSegment::WildcardSingle));
     }
@@ -531,18 +534,30 @@ mod tests {
     fn test_pattern_match_dynamic() {
         let pattern = RoutePattern::parse("/user/:id").unwrap();
         let params = pattern.matches("/user/123").unwrap();
-        assert_eq!(params.get(LiveId::from_str("id")), Some(LiveId::from_str("123")));
+        assert_eq!(
+            params.get(LiveId::from_str("id")),
+            Some(LiveId::from_str("123"))
+        );
 
         let params = pattern.matches("/user/john").unwrap();
-        assert_eq!(params.get(LiveId::from_str("id")), Some(LiveId::from_str("john")));
+        assert_eq!(
+            params.get(LiveId::from_str("id")),
+            Some(LiveId::from_str("john"))
+        );
     }
 
     #[test]
     fn test_pattern_match_multiple_dynamic() {
         let pattern = RoutePattern::parse("/post/:postId/:slug").unwrap();
         let params = pattern.matches("/post/123/my-post").unwrap();
-        assert_eq!(params.get(LiveId::from_str("postId")), Some(LiveId::from_str("123")));
-        assert_eq!(params.get(LiveId::from_str("slug")), Some(LiveId::from_str("my-post")));
+        assert_eq!(
+            params.get(LiveId::from_str("postId")),
+            Some(LiveId::from_str("123"))
+        );
+        assert_eq!(
+            params.get(LiveId::from_str("slug")),
+            Some(LiveId::from_str("my-post"))
+        );
     }
 
     #[test]
@@ -565,15 +580,19 @@ mod tests {
     #[test]
     fn test_pattern_prefix_tail_static() {
         let pattern = RoutePattern::parse("/admin").unwrap();
-        let (params, tail) = pattern.matches_prefix_with_tail("/admin/dashboard").unwrap();
-        assert_eq!(params.data.len(), 0);
+        let (params, tail) = pattern
+            .matches_prefix_with_tail("/admin/dashboard")
+            .unwrap();
+        assert!(params.is_empty());
         assert_eq!(tail, "/dashboard");
     }
 
     #[test]
     fn test_pattern_prefix_tail_wildcard_single() {
         let pattern = RoutePattern::parse("/admin/*").unwrap();
-        let (_params, tail) = pattern.matches_prefix_with_tail("/admin/dashboard").unwrap();
+        let (_params, tail) = pattern
+            .matches_prefix_with_tail("/admin/dashboard")
+            .unwrap();
         assert_eq!(tail, "/dashboard");
     }
 

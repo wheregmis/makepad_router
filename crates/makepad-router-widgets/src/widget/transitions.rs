@@ -3,7 +3,7 @@ use makepad_widgets::*;
 
 // Route transition presets and runtime state.
 
-use super::{hero::HeroTransitionState, RouterWidget};
+use super::RouterWidget;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RouterTransitionPreset {
@@ -72,7 +72,6 @@ pub(super) struct RouterTransitionState {
     pub(super) start_time: Option<f64>,
     pub(super) duration: f64,
     pub(super) progress: f64,
-    pub(super) hero: HeroTransitionState,
 }
 
 impl RouterTransitionState {
@@ -132,6 +131,10 @@ impl RouterWidget {
         direction: RouterTransitionDirection,
         override_spec: Option<RouterTransitionSpec>,
     ) {
+        if !self.transitions_enabled() {
+            self.transition_rt.state = None;
+            return;
+        }
         let Some(from_route) = from_route else {
             self.transition_rt.state = None;
             return;
@@ -167,7 +170,6 @@ impl RouterWidget {
             start_time: None,
             duration: spec.duration,
             progress: 0.0,
-            hero: HeroTransitionState::default(),
         });
         self.transition_rt.next_frame = cx.new_next_frame();
         self.redraw(cx);
@@ -347,7 +349,6 @@ mod tests {
             start_time: None,
             duration: 1.0,
             progress: 0.0,
-            hero: HeroTransitionState::default(),
         };
 
         assert!(!state.tick(10.0));

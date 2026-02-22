@@ -9,7 +9,7 @@ use crate::{
 };
 use makepad_widgets::*;
 
-use super::{RouterNavRequest, RouterWidget};
+use super::{RouterBlockReason, RouterNavRequest, RouterWidget};
 
 pub(super) const ROUTER_MAX_REDIRECTS: u8 = 8;
 
@@ -48,15 +48,18 @@ impl RouterWidget {
             return self.apply_request_bypassing_guards(cx, request);
         }
         if self.pending_navigation.is_some() {
+            self.last_blocked_reason = Some(RouterBlockReason::NoHistory);
             return false;
         }
         let Some((context, leaving)) = self.resolve_nav_context(cx, &request) else {
+            self.last_blocked_reason = Some(Self::infer_resolution_block_reason(&request));
             return false;
         };
 
         if !skip_before_leave && leaving {
             for hook in self.before_leave_hooks() {
                 if hook(cx, &context) == RouterBeforeLeaveDecision::Block {
+                    self.last_blocked_reason = Some(RouterBlockReason::BeforeLeaveBlocked);
                     return false;
                 }
             }
@@ -77,7 +80,6 @@ impl RouterWidget {
         let kind = Self::request_kind(request);
         let mut to: Option<Route> = None;
         let mut to_path: Option<String> = None;
-        let mut to_url: Option<String> = None;
 
         match request {
             RouterNavRequest::Navigate { route_id }
@@ -89,7 +91,8 @@ impl RouterWidget {
                 }
                 to = Some(Route::new(*route_id));
             }
-            RouterNavRequest::NavigateByPath { path } | RouterNavRequest::ReplaceByPath { path, .. } => {
+            RouterNavRequest::NavigateByPath { path }
+            | RouterNavRequest::ReplaceByPath { path, .. } => {
                 self.detect_child_routers(cx);
                 let parsed = self.parse_url_cached(path);
                 let query = RouteQuery::from_query_string(&parsed.query);
@@ -105,7 +108,8 @@ impl RouterWidget {
                     } else {
                         return None;
                     }
-                } else if let Some((route_id, params, pattern, _tail)) = self.resolve_nested_prefix(&path)
+                } else if let Some((route_id, params, pattern, _tail)) =
+                    self.resolve_nested_prefix(&path)
                 {
                     if self.routes.templates.contains_key(&route_id) {
                         to = Some(Route {
@@ -143,35 +147,6 @@ impl RouterWidget {
                 } else {
                     return None;
                 }
-            }
-            RouterNavRequest::NavigateByUrl { url } | RouterNavRequest::ReplaceByUrl { url } => {
-                let parsed = self.parse_url_cached(url);
-                let query = RouteQuery::from_query_string(&parsed.query);
-                let hash = parsed.hash.clone();
-                to_url = Some(url.clone());
-                to_path = Some(parsed.path.clone());
-
-                let inner_request = match request {
-                    RouterNavRequest::NavigateByUrl { .. } => RouterNavRequest::NavigateByPath {
-                        path: parsed.to_string(),
-                    },
-                    RouterNavRequest::ReplaceByUrl { .. } => RouterNavRequest::ReplaceByPath {
-                        path: parsed.to_string(),
-                        clear_extras: false,
-                    },
-                    _ => return None,
-                };
-
-                let (mut ctx, leaving) = self.resolve_nav_context(cx, &inner_request)?;
-
-                if let Some(to_route) = ctx.to.as_mut() {
-                    to_route.query = query;
-                    to_route.hash = hash;
-                }
-                ctx.kind = kind;
-                ctx.to_url = to_url;
-                ctx.to_path = to_path;
-                return Some((ctx, leaving));
             }
             RouterNavRequest::Back { .. } => {
                 let mut preview = self.router.clone();
@@ -225,26 +200,6 @@ impl RouterWidget {
                 }
                 to = preview.current_route().cloned();
             }
-            #[cfg(target_arch = "wasm32")]
-            RouterNavRequest::BrowserUrlChanged { url, .. } => {
-                let parsed = self.parse_url_cached(url);
-                to_url = Some(url.clone());
-                to_path = Some(parsed.path.clone());
-                return self
-                    .resolve_nav_context(
-                        cx,
-                        &RouterNavRequest::ReplaceByPath {
-                            path: parsed.to_string(),
-                            clear_extras: false,
-                        },
-                    )
-                    .map(|(mut ctx, leaving)| {
-                        ctx.kind = RouterNavKind::BrowserUrlChanged;
-                        ctx.to_url = to_url;
-                        ctx.to_path = to_path;
-                        (ctx, leaving)
-                    });
-            }
         }
 
         let leaving = match (&from, &to) {
@@ -259,7 +214,6 @@ impl RouterWidget {
                 from,
                 to,
                 to_path,
-                to_url,
             },
             leaving,
         ))
@@ -275,8 +229,6 @@ impl RouterWidget {
             }
             RouterNavRequest::NavigateByPath { .. } => RouterNavKind::NavigateByPath,
             RouterNavRequest::ReplaceByPath { .. } => RouterNavKind::ReplaceByPath,
-            RouterNavRequest::NavigateByUrl { .. } => RouterNavKind::NavigateByUrl,
-            RouterNavRequest::ReplaceByUrl { .. } => RouterNavKind::ReplaceByUrl,
             RouterNavRequest::Back { .. } => RouterNavKind::Back,
             RouterNavRequest::Forward { .. } => RouterNavKind::Forward,
             RouterNavRequest::Reset { .. } => RouterNavKind::Reset,
@@ -284,8 +236,6 @@ impl RouterWidget {
             RouterNavRequest::Pop => RouterNavKind::Pop,
             RouterNavRequest::PopTo { .. } => RouterNavKind::PopTo,
             RouterNavRequest::PopToRoot => RouterNavKind::PopToRoot,
-            #[cfg(target_arch = "wasm32")]
-            RouterNavRequest::BrowserUrlChanged { .. } => RouterNavKind::BrowserUrlChanged,
         }
     }
 
@@ -301,9 +251,13 @@ impl RouterWidget {
             for guard in self.route_guards() {
                 match guard(cx, &context) {
                     RouterGuardDecision::Allow => {}
-                    RouterGuardDecision::Block => return false,
+                    RouterGuardDecision::Block => {
+                        self.last_blocked_reason = Some(RouterBlockReason::GuardBlocked);
+                        return false;
+                    }
                     RouterGuardDecision::Redirect(redirect) => {
                         if redirect_depth >= ROUTER_MAX_REDIRECTS {
+                            self.last_blocked_reason = Some(RouterBlockReason::RedirectLimit);
                             log!("Router: guard redirect limit reached");
                             return false;
                         }
@@ -345,7 +299,10 @@ impl RouterWidget {
                 RouterAsyncDecision::Immediate(RouterBeforeLeaveDecision::Allow) => {
                     idx += 1;
                 }
-                RouterAsyncDecision::Immediate(RouterBeforeLeaveDecision::Block) => return false,
+                RouterAsyncDecision::Immediate(RouterBeforeLeaveDecision::Block) => {
+                    self.last_blocked_reason = Some(RouterBlockReason::BeforeLeaveBlocked);
+                    return false;
+                }
                 RouterAsyncDecision::Pending(rx) => {
                     self.pending_navigation = Some(PendingNavigation {
                         request,
@@ -375,9 +332,13 @@ impl RouterWidget {
         while idx < guards.len() {
             match (guards[idx])(cx, &context) {
                 RouterAsyncDecision::Immediate(RouterGuardDecision::Allow) => idx += 1,
-                RouterAsyncDecision::Immediate(RouterGuardDecision::Block) => return false,
+                RouterAsyncDecision::Immediate(RouterGuardDecision::Block) => {
+                    self.last_blocked_reason = Some(RouterBlockReason::GuardBlocked);
+                    return false;
+                }
                 RouterAsyncDecision::Immediate(RouterGuardDecision::Redirect(redirect)) => {
                     if redirect_depth >= ROUTER_MAX_REDIRECTS {
+                        self.last_blocked_reason = Some(RouterBlockReason::RedirectLimit);
                         log!("Router: guard redirect limit reached");
                         return false;
                     }
@@ -407,15 +368,15 @@ impl RouterWidget {
 
     fn redirect_to_request(target: RouterRedirectTarget, replace: bool) -> RouterNavRequest {
         match (target, replace) {
-            (RouterRedirectTarget::Route(route_id), false) => RouterNavRequest::Navigate { route_id },
+            (RouterRedirectTarget::Route(route_id), false) => {
+                RouterNavRequest::Navigate { route_id }
+            }
             (RouterRedirectTarget::Route(route_id), true) => RouterNavRequest::Replace { route_id },
             (RouterRedirectTarget::Path(path), false) => RouterNavRequest::NavigateByPath { path },
             (RouterRedirectTarget::Path(path), true) => RouterNavRequest::ReplaceByPath {
                 path,
                 clear_extras: true,
             },
-            (RouterRedirectTarget::Url(url), false) => RouterNavRequest::NavigateByUrl { url },
-            (RouterRedirectTarget::Url(url), true) => RouterNavRequest::ReplaceByUrl { url },
         }
     }
 
@@ -424,29 +385,18 @@ impl RouterWidget {
         self.guard_bypass = true;
         let out = match request {
             RouterNavRequest::Navigate { route_id } => self.navigate(cx, route_id),
-            RouterNavRequest::NavigateWithTransition { route_id, transition } => {
-                self.navigate_with_transition(cx, route_id, transition)
-            }
+            RouterNavRequest::NavigateWithTransition {
+                route_id,
+                transition,
+            } => self.navigate_with_transition(cx, route_id, transition),
             RouterNavRequest::Replace { route_id } => self.replace(cx, route_id),
-            RouterNavRequest::ReplaceWithTransition { route_id, transition } => {
-                self.replace_with_transition(cx, route_id, transition)
-            }
+            RouterNavRequest::ReplaceWithTransition {
+                route_id,
+                transition,
+            } => self.replace_with_transition(cx, route_id, transition),
             RouterNavRequest::NavigateByPath { path } => self.navigate_by_path(cx, &path),
             RouterNavRequest::ReplaceByPath { path, clear_extras } => {
-                let ok = self.replace_by_path_internal(cx, &path, clear_extras);
-                if ok {
-                    self.web_replace_current_url(cx);
-                }
-                ok
-            }
-            RouterNavRequest::NavigateByUrl { url } => self.navigate_by_url(cx, &url),
-            RouterNavRequest::ReplaceByUrl { url } => {
-                self.ensure_web_history_initialized(cx);
-                let ok = self.replace_by_path_internal(cx, &url, false);
-                if ok {
-                    self.web_replace_current_url(cx);
-                }
-                ok
+                self.replace_by_path_internal(cx, &path, clear_extras)
             }
             RouterNavRequest::Back { transition } => match transition {
                 Some(t) => self.back_with_transition(cx, t),
@@ -461,14 +411,20 @@ impl RouterWidget {
             RouterNavRequest::Pop => self.pop(cx),
             RouterNavRequest::PopTo { route_id } => self.pop_to(cx, route_id),
             RouterNavRequest::PopToRoot => self.pop_to_root(cx),
-            #[cfg(target_arch = "wasm32")]
-            RouterNavRequest::BrowserUrlChanged { url, state_index } => {
-                self.handle_browser_url_changed(cx, &url, state_index);
-                true
-            }
         };
         self.guard_bypass = prev;
         out
+    }
+
+    fn infer_resolution_block_reason(request: &RouterNavRequest) -> RouterBlockReason {
+        match request {
+            RouterNavRequest::Back { .. }
+            | RouterNavRequest::Forward { .. }
+            | RouterNavRequest::Pop
+            | RouterNavRequest::PopTo { .. }
+            | RouterNavRequest::PopToRoot => RouterBlockReason::NoHistory,
+            _ => RouterBlockReason::RouteMissing,
+        }
     }
 
     pub(super) fn poll_pending_navigation(&mut self, cx: &mut Cx) {
@@ -500,6 +456,7 @@ impl RouterWidget {
                 };
 
                 if decision != RouterBeforeLeaveDecision::Allow {
+                    self.last_blocked_reason = Some(RouterBlockReason::BeforeLeaveBlocked);
                     return;
                 }
                 let Some((context, _)) = self.resolve_nav_context(cx, &request) else {
@@ -548,13 +505,17 @@ impl RouterWidget {
                             redirect_depth,
                         );
                     }
-                    RouterGuardDecision::Block => {}
+                    RouterGuardDecision::Block => {
+                        self.last_blocked_reason = Some(RouterBlockReason::GuardBlocked);
+                    }
                     RouterGuardDecision::Redirect(redirect) => {
                         if redirect_depth >= ROUTER_MAX_REDIRECTS {
+                            self.last_blocked_reason = Some(RouterBlockReason::RedirectLimit);
                             log!("Router: guard redirect limit reached");
                             return;
                         }
-                        let next_request = Self::redirect_to_request(redirect.target, redirect.replace);
+                        let next_request =
+                            Self::redirect_to_request(redirect.target, redirect.replace);
                         let _ = self.request_navigation_internal(
                             cx,
                             next_request,

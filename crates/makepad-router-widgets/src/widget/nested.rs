@@ -10,6 +10,9 @@ impl RouterWidget {
         &mut self,
         path: &str,
     ) -> Option<(LiveId, RouteParams, RoutePatternRef, String)> {
+        if !self.nested_enabled() {
+            return None;
+        }
         if self.caches.nested_prefix_cache_epoch == self.caches.route_registry_epoch
             && self.caches.nested_prefix_cache_path == path
         {
@@ -53,6 +56,9 @@ impl RouterWidget {
         parent_route_id: LiveId,
         tail: &str,
     ) -> bool {
+        if !self.nested_enabled() {
+            return false;
+        }
         if tail.is_empty() {
             return true;
         }
@@ -70,17 +76,15 @@ impl RouterWidget {
     ///
     /// We scan the instantiated route widget tree for nested `RouterWidget` instances.
     pub(super) fn detect_child_routers(&mut self, _cx: &mut Cx) {
+        if !self.nested_enabled() {
+            return;
+        }
         for (route_id, route_widget) in self.routes.widgets.iter() {
             if self.child_routers.contains_key(route_id) {
                 continue;
             }
 
             if let Some(child_router) = Self::find_first_child_router(route_widget) {
-                if let Some(mut inner) = child_router.borrow_mut() {
-                    inner.url_sync = false;
-                    inner.use_initial_url = false;
-                    inner.web.history_initialized = false;
-                }
                 self.child_routers.insert(*route_id, child_router);
             }
         }
@@ -103,6 +107,10 @@ impl RouterWidget {
 
     /// Navigate to a nested route.
     pub fn navigate_nested(&mut self, cx: &mut Cx, path: &[LiveId], route: Route) -> bool {
+        if !self.nested_enabled() {
+            self.last_blocked_reason = Some(super::RouterBlockReason::CapabilityDisabled);
+            return false;
+        }
         if path.is_empty() {
             // Navigate in current router.
             if self.routes.templates.contains_key(&route.id) {

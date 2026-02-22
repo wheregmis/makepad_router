@@ -9,6 +9,6 @@ use makepad_micro_serde::*;
 pub struct RouterState {
     /// Navigation history stack.
     pub history: NavigationHistory,
-    /// Optional URL override used by the widget on web targets.
+    /// Optional URL/path override used when displaying the not-found route.
     pub url_path_override: Option<String>,
 }

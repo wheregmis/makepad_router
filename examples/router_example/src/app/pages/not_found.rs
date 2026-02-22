@@ -1,4 +1,4 @@
-use makepad_router::RouterWidgetRef;
+use makepad_router::{RouterCommand, RouterWidgetRef};
 use makepad_widgets::*;
 
 script_mod! {
@@ -22,13 +22,19 @@ pub struct NotFoundController;
 
 impl NotFoundController {
     pub fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions, router: &RouterWidgetRef) {
-        let Some(to_home) =
-            router.with_active_route_widget(|w| w.button(cx, &[live_id!(home_btn)]).clicked(actions))
+        let Some(to_home) = router
+            .with_active_route_widget(|w| w.button(cx, &[live_id!(home_btn)]).clicked(actions))
         else {
             return;
         };
         if to_home {
-            router.replace(cx, live_id!(home));
+            let _ = router.dispatch(
+                cx,
+                RouterCommand::ReplaceRoute {
+                    route_id: live_id!(home),
+                    transition: None,
+                },
+            );
         }
     }
 }

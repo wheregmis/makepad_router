@@ -1,6 +1,6 @@
 mod pages;
 
-use makepad_router::{RouterAction, RouterWidgetWidgetRefExt};
+use makepad_router::{RouterAction, RouterCommand, RouterWidgetWidgetRefExt};
 use makepad_widgets::*;
 use pages::{DetailController, HomeController, NotFoundController, SettingsController};
 
@@ -41,7 +41,8 @@ script_mod! {
                         height: Fill
                         default_route: @home
                         not_found_route: @not_found
-                        use_initial_url: true
+                        cap_transitions: true
+                        cap_nested: true
 
                         home := mod.widgets.RouterRoute{
                             route_pattern: "/"
@@ -106,27 +107,53 @@ impl MatchEvent for App {
 
         // Nav bar
         if self.ui.button(cx, ids!(nav_bar.home_btn)).clicked(actions) {
-            router.navigate(cx, live_id!(home));
+            let _ = router.dispatch(
+                cx,
+                RouterCommand::GoToRoute {
+                    route_id: live_id!(home),
+                    transition: None,
+                },
+            );
         }
         if self
             .ui
             .button(cx, ids!(nav_bar.settings_btn))
             .clicked(actions)
         {
-            router.navigate(cx, live_id!(settings));
+            let _ = router.dispatch(
+                cx,
+                RouterCommand::GoToRoute {
+                    route_id: live_id!(settings),
+                    transition: None,
+                },
+            );
         }
-        if self.ui.button(cx, ids!(nav_bar.detail_btn)).clicked(actions) {
-            router.navigate_by_path(cx, "/detail/42");
+        if self
+            .ui
+            .button(cx, ids!(nav_bar.detail_btn))
+            .clicked(actions)
+        {
+            let _ = router.dispatch(
+                cx,
+                RouterCommand::GoToPath {
+                    path: "/detail/42".to_string(),
+                },
+            );
         }
         if self
             .ui
             .button(cx, ids!(nav_bar.broken_link_btn))
             .clicked(actions)
         {
-            router.navigate_by_path(cx, "/this/route/does/not/exist");
+            let _ = router.dispatch(
+                cx,
+                RouterCommand::GoToPath {
+                    path: "/this/route/does/not/exist".to_string(),
+                },
+            );
         }
         if self.ui.button(cx, ids!(nav_bar.back_btn)).clicked(actions) {
-            router.back(cx);
+            let _ = router.dispatch(cx, RouterCommand::Back { transition: None });
         }
 
         // Routed buttons: delegate to the active page controller (route-scoped widget access).
@@ -148,7 +175,9 @@ impl MatchEvent for App {
                 .current_route_id()
                 .map(|id: LiveId| id.to_string())
                 .unwrap_or_else(|| "(none)".to_string()),
-            router.current_url().unwrap_or_else(|| "(no url)".to_string())
+            router
+                .current_url()
+                .unwrap_or_else(|| "(no url)".to_string())
         );
         self.ui
             .label(cx, ids!(nav_bar.status_label))

@@ -8,31 +8,47 @@ A standalone routing package for Makepad applications, providing navigation, dee
 - **Path patterns** with params and wildcards (`/user/:id`, `/admin/*`, `/docs/**`)
 - **Navigation history** with back/forward semantics
 - **Query + hash support** per history entry
-- **URL sync (web)** with `use_initial_url` for deep linking
 - **Nested routers** for sub-navigation
-- **Transitions** + optional hero (shared element) transitions
+- **Transitions** (opt-in)
 - **Guards + before-leave hooks** (sync + async)
 - **State persistence** via SerRon/DeRon
 - **Debug inspector overlay** for dev diagnostics
 
 ## RouterWidget Toggles
 
-These script properties control optional subsystems. All default to behavior shown in the example app.
+These script properties control optional subsystems.
+Advanced subsystems are opt-in and disabled by default.
 
-- `url_sync` (bool): sync route changes into browser URL/history on web builds.
-- `use_initial_url` (bool): apply the initial browser URL on startup (web only).
 - `persist_state` (bool): serialize/restore router state via `RouterState`.
-- `hero_transition` (bool): enable shared-element transitions (requires `Hero` widgets).
 - `debug_inspector` (bool): show a small overlay with route/stack/params.
 - `push_transition`, `pop_transition`, `replace_transition`, `transition_duration`: configure route transitions.
+- `cap_guards_sync`, `cap_guards_async`: enable sync/async guards.
+- `cap_transitions`: enable transition runtime.
+- `cap_nested`: enable nested-router behavior.
+- `cap_persistence`: enable `get_state` / `set_state`.
 
 Route metadata is configured on `RouterRoute` entries (`route_pattern`, `route_transition`, `route_transition_duration`), not directly on page widgets.
+
+## Command API
+
+Use `dispatch` as the single mutation entrypoint:
+
+```rust
+let result = router.dispatch(cx, RouterCommand::GoToRoute {
+    route_id: live_id!(settings),
+    transition: None,
+});
+
+if !result.changed {
+    log!("blocked: {:?}", result.blocked_reason);
+}
+```
 
 ## Quick Start
 
 ```rust
 use makepad_widgets::*;
-use makepad_router::{RouterWidgetWidgetRefExt, RouterAction};
+use makepad_router::{RouterAction, RouterCommand, RouterWidgetWidgetRefExt};
 
 app_main!(App);
 
@@ -47,6 +63,8 @@ script_mod! {
                     height: Fill
                     default_route: @home
                     not_found_route: @not_found
+                    cap_nested: true
+                    cap_transitions: true
 
                     home := RouterRoute{
                         route_pattern: "/"
@@ -82,11 +100,14 @@ impl MatchEvent for App {
         let router = self.ui.router_widget(cx, ids!(router));
 
         if self.ui.button(cx, ids!(home_btn)).clicked(actions) {
-            router.navigate(cx, live_id!(home));
+            let _ = router.dispatch(cx, RouterCommand::GoToRoute {
+                route_id: live_id!(home),
+                transition: None,
+            });
         }
 
         if self.ui.button(cx, ids!(back_btn)).clicked(actions) {
-            router.back(cx);
+            let _ = router.dispatch(cx, RouterCommand::Back { transition: None });
         }
 
         for action in actions.filter_widget_actions(router.widget_uid()) {
@@ -104,7 +125,9 @@ impl MatchEvent for App {
 use makepad_router::prelude::*;
 
 // Navigate by path (matches registered patterns)
-router.navigate_by_path(cx, "/detail/42?tab=posts");
+router.dispatch(cx, RouterCommand::GoToPath {
+    path: "/detail/42?tab=posts".to_string(),
+});
 
 // Read params/query from current route
 if let Some(route) = router.current_route() {
@@ -122,7 +145,7 @@ if let Some(route) = router.current_route() {
 ```rust
 use makepad_router::{RouterGuardDecision, RouterRedirect, RouterRedirectTarget, RouterBeforeLeaveDecision};
 
-router.add_route_guard(|_cx, nav| {
+let _ = router.add_route_guard(|_cx, nav| {
     if nav.to.as_ref().map(|r| r.id) == Some(live_id!(admin)) {
         return RouterGuardDecision::Redirect(RouterRedirect {
             target: RouterRedirectTarget::Route(live_id!(login)),
@@ -132,7 +155,7 @@ router.add_route_guard(|_cx, nav| {
     RouterGuardDecision::Allow
 });
 
-router.add_before_leave_hook(|_cx, nav| {
+let _ = router.add_before_leave_hook(|_cx, nav| {
     if nav.from.as_ref().map(|r| r.id) == Some(live_id!(settings)) {
         return RouterBeforeLeaveDecision::Block;
     }

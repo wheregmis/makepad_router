@@ -11,31 +11,35 @@ use crate::{
 use makepad_draw::draw_list_2d::DrawListExt;
 use makepad_widgets::*;
 
-pub use crate::hero::Hero;
-
-mod api;
 mod actions;
+mod api;
 mod callbacks;
+mod commands;
+mod engine;
+mod features;
 mod fields;
-mod guards;
 mod guard_flow;
-mod hero;
-mod hero_render;
+mod guards;
 mod inspector;
 mod live_apply;
 mod nested;
 mod path_nav;
 mod persistence;
+mod route_defs;
+mod route_render;
 mod route_widgets;
 mod transitions;
 mod url_cache;
-mod url_sync;
+mod url_state;
 
-use guard_flow::PendingNavigation;
+pub use commands::{
+    RouterBlockReason, RouterCapabilities, RouterCommand, RouterConfig, RouterDispatchResult,
+};
 use fields::{
     PointerCleanup, RouterCaches, RouterCallbacks, RouterDrawLists, RouterGuards, RouterRouteMaps,
-    TransitionRuntime, WebUrlState,
+    TransitionRuntime,
 };
+use guard_flow::PendingNavigation;
 use transitions::{RouterActionKind, RouterTransitionDirection, RouterTransitionState};
 pub use transitions::{RouterTransitionPreset, RouterTransitionSpec};
 
@@ -63,7 +67,6 @@ script_mod! {
         pop_transition: @none
         replace_transition: @none
         transition_duration: 0.25
-        hero_transition: false
         debug_inspector: false
         inspector_bg +: {draw_depth: 10.0, color: #x00000012}
         inspector_text +: {
@@ -72,9 +75,11 @@ script_mod! {
             draw_depth: 11.0
         }
 
-        // Phase 4: URL + deep linking (web only).
-        url_sync: true
-        use_initial_url: false
+        cap_guards_sync: false
+        cap_guards_async: false
+        cap_transitions: false
+        cap_nested: false
+        cap_persistence: false
     }
 
     mod.widgets.RouterWidget = mod.widgets.RouterWidgetBase {
@@ -88,11 +93,6 @@ script_mod! {
     }
 
     mod.widgets.RouterRoute = mod.widgets.RouterRouteBase {}
-
-    mod.widgets.Hero = #(Hero::register_widget(vm)) {
-        width: Fit
-        height: Fit
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -118,12 +118,6 @@ enum RouterNavRequest {
         path: String,
         clear_extras: bool,
     },
-    NavigateByUrl {
-        url: String,
-    },
-    ReplaceByUrl {
-        url: String,
-    },
     Back {
         transition: Option<RouterTransitionSpec>,
     },
@@ -141,11 +135,6 @@ enum RouterNavRequest {
         route_id: LiveId,
     },
     PopToRoot,
-    #[cfg(target_arch = "wasm32")]
-    BrowserUrlChanged {
-        url: String,
-        state_index: i32,
-    },
 }
 
 /// Route entry wrapper that carries route metadata plus a page widget child.
@@ -194,12 +183,6 @@ pub struct RouterWidget {
     default_route: LiveId,
     #[live]
     not_found_route: LiveId,
-    /// Sync route changes into the browser URL/history on web (wasm32).
-    #[live(true)]
-    url_sync: bool,
-    /// When `url_sync` is enabled, use the initial browser URL on startup (web only).
-    #[live(false)]
-    use_initial_url: bool,
     #[live(false)]
     persist_state: bool,
     /// Default transition used for push/navigate.
@@ -214,12 +197,19 @@ pub struct RouterWidget {
     /// Default transition duration (seconds).
     #[live(0.25)]
     transition_duration: f64,
-    /// Enables shared-element ("hero") transitions between routes.
-    #[live(false)]
-    hero_transition: bool,
     /// Shows a small debug overlay with current route/stack/params (dev tool).
     #[live(false)]
     debug_inspector: bool,
+    #[live(false)]
+    cap_guards_sync: bool,
+    #[live(false)]
+    cap_guards_async: bool,
+    #[live(false)]
+    cap_transitions: bool,
+    #[live(false)]
+    cap_nested: bool,
+    #[live(false)]
+    cap_persistence: bool,
     #[rust]
     router: Router,
     #[rust]
@@ -237,7 +227,7 @@ pub struct RouterWidget {
     #[rust]
     pending_actions: Vec<RouterAction>,
     #[rust]
-    web: WebUrlState,
+    url_path_override: Option<String>,
     #[rust]
     caches: RouterCaches,
     #[rust]
@@ -250,15 +240,16 @@ pub struct RouterWidget {
     inspector_text: DrawText,
     #[rust]
     transition_rt: TransitionRuntime,
+    #[rust]
+    last_blocked_reason: Option<RouterBlockReason>,
 }
 
 impl RouterWidget {
     /// Register a child router
     pub fn register_child_router(&mut self, route_id: LiveId, child: RouterWidgetRef) {
-        if let Some(mut inner) = child.borrow_mut() {
-            inner.url_sync = false;
-            inner.use_initial_url = false;
-            inner.web.history_initialized = false;
+        if !self.nested_enabled() {
+            self.last_blocked_reason = Some(RouterBlockReason::CapabilityDisabled);
+            return;
         }
         self.child_routers.insert(route_id, child);
     }
@@ -277,7 +268,6 @@ impl RouterWidget {
         self.caches.nested_prefix_cache_result = None;
         Ok(())
     }
-
 }
 
 impl WidgetNode for RouterWidget {
@@ -312,22 +302,6 @@ impl WidgetNode for RouterWidget {
 
 impl Widget for RouterWidget {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
-        #[cfg(target_arch = "wasm32")]
-        if let Event::ToWasmMsg(msg) = event {
-            if msg.id == live_id!(ToWasmBrowserUrlChanged) {
-                let mut r = msg.as_ref();
-                let url = r.read_string();
-                let state_index = r.read_f64() as i32;
-                self.handle_browser_url_changed(cx, &url, state_index);
-            }
-        }
-
-        if matches!(event, Event::Startup) {
-            // Defer initial URL application to Startup so apps can install guards before we
-            // resolve and commit the initial browser URL.
-            self.apply_initial_url_if_needed(cx);
-        }
-
         if let Some(ne) = self.transition_rt.next_frame.is_event(event) {
             self.update_transition(cx, ne.time);
         }
@@ -357,9 +331,7 @@ impl Widget for RouterWidget {
             }
         }
 
-        // Nested routers have `url_sync` disabled; sync the full (composed) URL from here.
         self.poll_pending_navigation(cx);
-        self.sync_web_url_if_needed(cx);
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
@@ -370,7 +342,7 @@ impl Widget for RouterWidget {
         cx.begin_turtle(walk, layout);
 
         let rect = cx.turtle().inner_rect();
-        self.draw_routes_with_hero(cx, scope, rect);
+        self.draw_routes_with_transition(cx, scope, rect);
 
         self.draw_debug_inspector(cx, rect);
 
@@ -396,88 +368,6 @@ impl RouterWidgetRef {
         Some(f(route_widget))
     }
 
-    pub fn navigate(&self, cx: &mut Cx, route_id: LiveId) -> bool {
-        if let Some(mut inner) = self.borrow_mut() {
-            inner.navigate(cx, route_id)
-        } else {
-            false
-        }
-    }
-
-    pub fn navigate_with_transition(
-        &self,
-        cx: &mut Cx,
-        route_id: LiveId,
-        transition: RouterTransitionSpec,
-    ) -> bool {
-        if let Some(mut inner) = self.borrow_mut() {
-            inner.navigate_with_transition(cx, route_id, transition)
-        } else {
-            false
-        }
-    }
-
-    pub fn navigate_by_url(&self, cx: &mut Cx, url: &str) -> bool {
-        if let Some(mut inner) = self.borrow_mut() {
-            inner.navigate_by_url(cx, url)
-        } else {
-            false
-        }
-    }
-
-    pub fn back(&self, cx: &mut Cx) -> bool {
-        if let Some(mut inner) = self.borrow_mut() {
-            inner.back(cx)
-        } else {
-            false
-        }
-    }
-
-    pub fn back_with_transition(&self, cx: &mut Cx, transition: RouterTransitionSpec) -> bool {
-        if let Some(mut inner) = self.borrow_mut() {
-            inner.back_with_transition(cx, transition)
-        } else {
-            false
-        }
-    }
-
-    pub fn replace(&self, cx: &mut Cx, route_id: LiveId) -> bool {
-        if let Some(mut inner) = self.borrow_mut() {
-            inner.replace(cx, route_id)
-        } else {
-            false
-        }
-    }
-
-    pub fn replace_with_transition(
-        &self,
-        cx: &mut Cx,
-        route_id: LiveId,
-        transition: RouterTransitionSpec,
-    ) -> bool {
-        if let Some(mut inner) = self.borrow_mut() {
-            inner.replace_with_transition(cx, route_id, transition)
-        } else {
-            false
-        }
-    }
-
-    pub fn forward(&self, cx: &mut Cx) -> bool {
-        if let Some(mut inner) = self.borrow_mut() {
-            inner.forward(cx)
-        } else {
-            false
-        }
-    }
-
-    pub fn forward_with_transition(&self, cx: &mut Cx, transition: RouterTransitionSpec) -> bool {
-        if let Some(mut inner) = self.borrow_mut() {
-            inner.forward_with_transition(cx, transition)
-        } else {
-            false
-        }
-    }
-
     pub fn can_go_back(&self) -> bool {
         if let Some(inner) = self.borrow() {
             inner.can_go_back()
@@ -499,60 +389,6 @@ impl RouterWidgetRef {
             inner.depth()
         } else {
             0
-        }
-    }
-
-    pub fn clear_history(&self, cx: &mut Cx) {
-        if let Some(mut inner) = self.borrow_mut() {
-            inner.clear_history(cx);
-        }
-    }
-
-    pub fn reset(&self, cx: &mut Cx, route: Route) -> bool {
-        if let Some(mut inner) = self.borrow_mut() {
-            inner.reset(cx, route)
-        } else {
-            false
-        }
-    }
-
-    pub fn push(&self, cx: &mut Cx, route_id: LiveId) -> bool {
-        if let Some(mut inner) = self.borrow_mut() {
-            inner.push(cx, route_id)
-        } else {
-            false
-        }
-    }
-
-    pub fn pop(&self, cx: &mut Cx) -> bool {
-        if let Some(mut inner) = self.borrow_mut() {
-            inner.pop(cx)
-        } else {
-            false
-        }
-    }
-
-    pub fn pop_to(&self, cx: &mut Cx, route_id: LiveId) -> bool {
-        if let Some(mut inner) = self.borrow_mut() {
-            inner.pop_to(cx, route_id)
-        } else {
-            false
-        }
-    }
-
-    pub fn pop_to_root(&self, cx: &mut Cx) -> bool {
-        if let Some(mut inner) = self.borrow_mut() {
-            inner.pop_to_root(cx)
-        } else {
-            false
-        }
-    }
-
-    pub fn set_stack(&self, cx: &mut Cx, stack: Vec<Route>) -> bool {
-        if let Some(mut inner) = self.borrow_mut() {
-            inner.set_stack(cx, stack)
-        } else {
-            false
         }
     }
 
@@ -648,38 +484,10 @@ impl RouterWidgetRef {
         }
     }
 
-    pub fn navigate_by_path(&self, cx: &mut Cx, path: &str) -> bool {
-        if let Some(mut inner) = self.borrow_mut() {
-            inner.navigate_by_path(cx, path)
-        } else {
-            false
-        }
-    }
-
     pub fn register_child_router(&self, route_id: LiveId, child: RouterWidgetRef) {
         if let Some(mut inner) = self.borrow_mut() {
             inner.register_child_router(route_id, child);
         }
-    }
-
-    /// Navigate to a route when a button is clicked
-    /// This is a convenience method that checks if the button was clicked and navigates
-    pub fn navigate_on_click(
-        &self,
-        cx: &mut Cx,
-        actions: &Actions,
-        button_id: LiveId,
-        target_route: LiveId,
-    ) -> bool {
-        if self
-            .with_active_route_widget(|route_widget| {
-                route_widget.button(cx, &[button_id]).clicked(actions)
-            })
-            .unwrap_or(false)
-        {
-            return self.navigate(cx, target_route);
-        }
-        false
     }
 
     /// Register a route change callback
@@ -692,16 +500,18 @@ impl RouterWidgetRef {
         }
     }
 
-    pub fn add_route_guard<F>(&self, guard: F)
+    pub fn add_route_guard<F>(&self, guard: F) -> Result<(), RouterBlockReason>
     where
         F: Fn(&mut Cx, &RouterNavContext) -> RouterGuardDecision + Send + Sync + 'static,
     {
         if let Some(mut inner) = self.borrow_mut() {
-            inner.add_route_guard(guard);
+            inner.add_route_guard(guard)
+        } else {
+            Err(RouterBlockReason::CapabilityDisabled)
         }
     }
 
-    pub fn add_route_guard_async<F>(&self, guard: F)
+    pub fn add_route_guard_async<F>(&self, guard: F) -> Result<(), RouterBlockReason>
     where
         F: Fn(&mut Cx, &RouterNavContext) -> RouterAsyncDecision<RouterGuardDecision>
             + Send
@@ -709,20 +519,24 @@ impl RouterWidgetRef {
             + 'static,
     {
         if let Some(mut inner) = self.borrow_mut() {
-            inner.add_route_guard_async(guard);
+            inner.add_route_guard_async(guard)
+        } else {
+            Err(RouterBlockReason::CapabilityDisabled)
         }
     }
 
-    pub fn add_before_leave_hook<F>(&self, hook: F)
+    pub fn add_before_leave_hook<F>(&self, hook: F) -> Result<(), RouterBlockReason>
     where
         F: Fn(&mut Cx, &RouterNavContext) -> RouterBeforeLeaveDecision + Send + Sync + 'static,
     {
         if let Some(mut inner) = self.borrow_mut() {
-            inner.add_before_leave_hook(hook);
+            inner.add_before_leave_hook(hook)
+        } else {
+            Err(RouterBlockReason::CapabilityDisabled)
         }
     }
 
-    pub fn add_before_leave_hook_async<F>(&self, hook: F)
+    pub fn add_before_leave_hook_async<F>(&self, hook: F) -> Result<(), RouterBlockReason>
     where
         F: Fn(&mut Cx, &RouterNavContext) -> RouterAsyncDecision<RouterBeforeLeaveDecision>
             + Send
@@ -730,7 +544,9 @@ impl RouterWidgetRef {
             + 'static,
     {
         if let Some(mut inner) = self.borrow_mut() {
-            inner.add_before_leave_hook_async(hook);
+            inner.add_before_leave_hook_async(hook)
+        } else {
+            Err(RouterBlockReason::CapabilityDisabled)
         }
     }
 
@@ -739,14 +555,6 @@ impl RouterWidgetRef {
             inner.register_route_pattern(pattern, route_id)
         } else {
             Err("Cannot borrow router widget".to_string())
-        }
-    }
-
-    pub fn navigate_nested(&self, cx: &mut Cx, path: &[LiveId], route: Route) -> bool {
-        if let Some(mut inner) = self.borrow_mut() {
-            inner.navigate_nested(cx, path, route)
-        } else {
-            false
         }
     }
 }

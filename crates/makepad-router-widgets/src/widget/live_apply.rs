@@ -2,38 +2,8 @@ use crate::registry::RouteRegistry;
 use crate::route::Route;
 use makepad_widgets::*;
 
+use super::route_defs::route_definition_from_template;
 use super::RouterWidget;
-
-impl RouterWidget {
-    fn script_value_to_string(vm: &mut ScriptVm, value: ScriptValue) -> Option<String> {
-        vm.string_with(value, |_vm, value| value.to_string())
-    }
-
-    fn route_metadata_from_template(
-        vm: &mut ScriptVm,
-        template_obj: ScriptObject,
-    ) -> (Option<String>, Option<LiveId>, Option<f64>) {
-        let route_pattern = Self::script_value_to_string(
-            vm,
-            vm.bx.heap.value(template_obj, id!(route_pattern).into(), NoTrap),
-        );
-
-        let route_transition_value =
-            vm.bx.heap
-                .value(template_obj, id!(route_transition).into(), NoTrap);
-        let route_transition = route_transition_value.as_id().or_else(|| {
-            Self::script_value_to_string(vm, route_transition_value).map(|v| LiveId::from_str(&v))
-        });
-
-        let route_transition_duration = vm
-            .bx
-            .heap
-            .value(template_obj, id!(route_transition_duration).into(), NoTrap)
-            .as_number();
-
-        (route_pattern, route_transition, route_transition_duration)
-    }
-}
 
 impl ScriptHook for RouterWidget {
     fn on_before_apply(
@@ -83,10 +53,9 @@ impl ScriptHook for RouterWidget {
                         let template_ref = vm.bx.heap.new_object_ref(template_obj);
                         self.routes.templates.insert(route_id, template_ref);
 
-                        let (route_pattern, route_transition, route_transition_duration) =
-                            Self::route_metadata_from_template(vm, template_obj);
+                        let route_def = route_definition_from_template(vm, template_obj);
 
-                        if let Some(pattern) = route_pattern {
+                        if let Some(pattern) = route_def.pattern {
                             self.routes.patterns.insert(route_id, pattern.clone());
                             if let Err(err) = self.router.register_route_pattern(&pattern, route_id)
                             {
@@ -97,13 +66,15 @@ impl ScriptHook for RouterWidget {
                             }
                         }
 
-                        if let Some(transition) = route_transition {
+                        if let Some(transition) = route_def.transition {
                             if transition.0 != 0 {
-                                self.routes.transition_overrides.insert(route_id, transition);
+                                self.routes
+                                    .transition_overrides
+                                    .insert(route_id, transition);
                             }
                         }
 
-                        if let Some(duration) = route_transition_duration {
+                        if let Some(duration) = route_def.transition_duration {
                             self.routes
                                 .transition_duration_overrides
                                 .insert(route_id, duration);
@@ -126,7 +97,7 @@ impl ScriptHook for RouterWidget {
                 };
 
                 if initial_route.0 != 0 {
-                    self.router.persist_state = self.persist_state;
+                    self.router.persist_state = self.persist_state && self.persistence_enabled();
                     self.router.reset(Route::new(initial_route));
                     self.active_route = initial_route;
                 }

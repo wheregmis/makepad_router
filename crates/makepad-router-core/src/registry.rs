@@ -74,7 +74,9 @@ impl RouteRegistry {
 
         // Insert in sorted order by priority (lower priority value = higher priority)
         // Find insertion point
-        let pos = self.by_pattern.iter()
+        let pos = self
+            .by_pattern
+            .iter()
             .position(|e| e.priority > priority)
             .unwrap_or(self.by_pattern.len());
         self.by_pattern.insert(pos, entry);
@@ -107,7 +109,9 @@ impl RouteRegistry {
         if let Some(candidates) = self.by_first_segment.get(&first) {
             for &idx in candidates {
                 let entry = self.by_pattern.get(idx)?;
-                let Some(ref pattern) = entry.pattern else { continue };
+                let Some(ref pattern) = entry.pattern else {
+                    continue;
+                };
                 if let Some(params) = pattern.matches(&normalized) {
                     return Some(Route {
                         id: entry.route_id,
@@ -122,7 +126,9 @@ impl RouteRegistry {
 
         for &idx in &self.fallback_first_segment {
             let entry = self.by_pattern.get(idx)?;
-            let Some(ref pattern) = entry.pattern else { continue };
+            let Some(ref pattern) = entry.pattern else {
+                continue;
+            };
             if let Some(params) = pattern.matches(&normalized) {
                 return Some(Route {
                     id: entry.route_id,
@@ -272,28 +278,43 @@ mod tests {
     #[test]
     fn test_route_registry_register_pattern() {
         let mut registry = RouteRegistry::new();
-        registry.register_pattern("/user/:id", live_id!(user_profile)).unwrap();
+        registry
+            .register_pattern("/user/:id", live_id!(user_profile))
+            .unwrap();
         assert!(registry.has_route(live_id!(user_profile)));
     }
 
     #[test]
     fn test_route_registry_resolve_path() {
         let mut registry = RouteRegistry::new();
-        registry.register_pattern("/user/:id", live_id!(user_profile)).unwrap();
+        registry
+            .register_pattern("/user/:id", live_id!(user_profile))
+            .unwrap();
 
         let route = registry.resolve_path("/user/123").unwrap();
         assert_eq!(route.id, live_id!(user_profile));
-        assert_eq!(route.get_param(LiveId::from_str("id")), Some(LiveId::from_str("123")));
+        assert_eq!(
+            route.get_param(LiveId::from_str("id")),
+            Some(LiveId::from_str("123"))
+        );
     }
 
     #[test]
     fn test_route_registry_priority() {
         let mut registry = RouteRegistry::new();
         // Register in reverse priority order
-        registry.register_pattern("/user/**", live_id!(user_wildcard)).unwrap();
-        registry.register_pattern("/user/*", live_id!(user_single)).unwrap();
-        registry.register_pattern("/user/:id", live_id!(user_dynamic)).unwrap();
-        registry.register_pattern("/user/profile", live_id!(user_static)).unwrap();
+        registry
+            .register_pattern("/user/**", live_id!(user_wildcard))
+            .unwrap();
+        registry
+            .register_pattern("/user/*", live_id!(user_single))
+            .unwrap();
+        registry
+            .register_pattern("/user/:id", live_id!(user_dynamic))
+            .unwrap();
+        registry
+            .register_pattern("/user/profile", live_id!(user_static))
+            .unwrap();
 
         // Most specific should match first
         let route = registry.resolve_path("/user/profile").unwrap();

@@ -1,9 +1,9 @@
 #![allow(clippy::question_mark)]
 
-use makepad_live_id::*;
-use makepad_micro_serde::*;
 use crate::pattern::{RouteParams, RoutePattern, RoutePatternRef};
 use crate::url;
+use makepad_live_id::*;
+use makepad_micro_serde::*;
 use std::collections::HashMap;
 
 /// Represents a route in the application
@@ -78,7 +78,8 @@ impl Route {
 
     /// Get a parameter value as a `String`.
     pub fn get_param_string(&self, key: LiveId) -> Option<String> {
-        self.get_param(key)?.as_string(|id_str| id_str.map(|s| s.to_string()))
+        self.get_param(key)?
+            .as_string(|id_str| id_str.map(|s| s.to_string()))
     }
 
     /// Get a parameter value as `i64` (parsed).

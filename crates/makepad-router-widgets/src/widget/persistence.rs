@@ -3,17 +3,24 @@ use makepad_widgets::{Cx, WidgetNode};
 
 // Router state persistence helpers.
 
-use super::{RouterAction, RouterWidget};
+use super::{RouterAction, RouterBlockReason, RouterWidget};
 
 impl RouterWidget {
     pub(super) fn build_state(&self) -> RouterState {
+        if !self.persistence_enabled() {
+            return RouterState::default();
+        }
         RouterState {
             history: self.router.history.clone(),
-            url_path_override: self.web.url_path_override.clone(),
+            url_path_override: self.url_path_override.clone(),
         }
     }
 
     pub(super) fn apply_state(&mut self, cx: &mut Cx, state: RouterState) -> bool {
+        if !self.persistence_enabled() {
+            self.last_blocked_reason = Some(RouterBlockReason::CapabilityDisabled);
+            return false;
+        }
         let old_route = self.router.current_route().cloned();
         let (stack, current_index) = state.history.into_parts();
 
@@ -33,8 +40,9 @@ impl RouterWidget {
         }
 
         self.clear_url_extras();
-        self.web.url_path_override = state.url_path_override;
-        self.router.history = crate::navigation::NavigationHistory::from_parts(filtered, new_current);
+        self.url_path_override = state.url_path_override;
+        self.router.history =
+            crate::navigation::NavigationHistory::from_parts(filtered, new_current);
         let Some(new_route) = self.router.current_route().cloned() else {
             return false;
         };
@@ -49,7 +57,6 @@ impl RouterWidget {
             &new_route,
         );
 
-        self.web_replace_current_url(cx);
         self.redraw(cx);
         true
     }

@@ -1,28 +1,12 @@
 use crate::{route::Route, router::RouterAction, state::RouterState};
 use makepad_widgets::*;
 
-use super::{RouterNavRequest, RouterWidget, RouterActionKind, RouterTransitionDirection, RouterTransitionSpec};
+use super::{
+    RouterActionKind, RouterNavRequest, RouterTransitionDirection, RouterTransitionSpec,
+    RouterWidget,
+};
 
 impl RouterWidget {
-    /// Navigate using a URL string (web-style). Returns true on success.
-    pub fn navigate_by_url(&mut self, cx: &mut Cx, url: &str) -> bool {
-        if !self.guard_bypass {
-            return self.request_navigation(
-                cx,
-                RouterNavRequest::NavigateByUrl {
-                    url: url.to_string(),
-                },
-            );
-        }
-        self.ensure_web_history_initialized(cx);
-        let ok = self.navigate_by_path_internal(cx, url, false);
-
-        if ok {
-            self.web_push_current_url(cx);
-        }
-        ok
-    }
-
     /// Navigate to a route by id. Returns true if the route exists.
     pub fn navigate(&mut self, cx: &mut Cx, route_id: LiveId) -> bool {
         if !self.guard_bypass {
@@ -53,7 +37,6 @@ impl RouterWidget {
                 );
             }
 
-            self.web_push_current_url(cx);
             self.redraw(cx);
             true
         } else {
@@ -103,7 +86,6 @@ impl RouterWidget {
                 );
             }
 
-            self.web_push_current_url(cx);
             self.redraw(cx);
             true
         } else {
@@ -142,7 +124,6 @@ impl RouterWidget {
                 );
             }
 
-            self.web_replace_current_url(cx);
             self.redraw(cx);
             true
         } else {
@@ -192,7 +173,6 @@ impl RouterWidget {
                 );
             }
 
-            self.web_replace_current_url(cx);
             self.redraw(cx);
             true
         } else {
@@ -229,7 +209,6 @@ impl RouterWidget {
                     &route,
                 );
 
-                self.web_go(cx, -1);
                 self.redraw(cx);
                 true
             } else {
@@ -270,7 +249,6 @@ impl RouterWidget {
                     old_route.as_ref().map(|r| r.id),
                     &route,
                 );
-                self.web_go(cx, -1);
                 self.redraw(cx);
                 true
             } else {
@@ -306,7 +284,6 @@ impl RouterWidget {
                     old_route.as_ref().map(|r| r.id),
                     &route,
                 );
-                self.web_go(cx, 1);
                 self.redraw(cx);
                 true
             } else {
@@ -351,7 +328,6 @@ impl RouterWidget {
                     old_route.as_ref().map(|r| r.id),
                     &route,
                 );
-                self.web_go(cx, 1);
                 self.redraw(cx);
                 true
             } else {
@@ -395,7 +371,6 @@ impl RouterWidget {
     /// Clear history, keeping the current route.
     pub fn clear_history(&mut self, cx: &mut Cx) {
         self.router.clear_history();
-        self.web_replace_current_url(cx);
         self.redraw(cx);
     }
 
@@ -431,7 +406,6 @@ impl RouterWidget {
             );
         }
 
-        self.web_replace_current_url(cx);
         self.redraw(cx);
         true
     }
@@ -462,7 +436,6 @@ impl RouterWidget {
                 );
                 self.dispatch_route_change(cx, old_route.clone(), new_route.clone());
                 self.queue_route_actions(None, old_route.as_ref().map(|r| r.id), &new_route);
-                self.web_go(cx, -1);
                 self.redraw(cx);
                 return true;
             }
@@ -475,7 +448,6 @@ impl RouterWidget {
         if !self.guard_bypass {
             return self.request_navigation(cx, RouterNavRequest::PopTo { route_id });
         }
-        let before_depth = self.router.depth() as i32;
         let old_route = self.router.current_route().cloned();
         if self.router.pop_to(route_id) {
             if let Some(new_route) = self.router.current_route().cloned() {
@@ -492,11 +464,6 @@ impl RouterWidget {
                 );
                 self.dispatch_route_change(cx, old_route.clone(), new_route.clone());
                 self.queue_route_actions(None, old_route.as_ref().map(|r| r.id), &new_route);
-                let after_depth = self.router.depth() as i32;
-                let delta = after_depth - before_depth;
-                if delta != 0 {
-                    self.web_go(cx, delta);
-                }
                 self.redraw(cx);
                 return true;
             }
@@ -509,7 +476,6 @@ impl RouterWidget {
         if !self.guard_bypass {
             return self.request_navigation(cx, RouterNavRequest::PopToRoot);
         }
-        let before_depth = self.router.depth() as i32;
         let old_route = self.router.current_route().cloned();
         if self.router.pop_to_root() {
             if let Some(new_route) = self.router.current_route().cloned() {
@@ -526,11 +492,6 @@ impl RouterWidget {
                 );
                 self.dispatch_route_change(cx, old_route.clone(), new_route.clone());
                 self.queue_route_actions(None, old_route.as_ref().map(|r| r.id), &new_route);
-                let after_depth = self.router.depth() as i32;
-                let delta = after_depth - before_depth;
-                if delta != 0 {
-                    self.web_go(cx, delta);
-                }
                 self.redraw(cx);
                 return true;
             }
@@ -572,7 +533,6 @@ impl RouterWidget {
             old_route.as_ref().map(|r| r.id),
             &new_route,
         );
-        self.web_replace_current_url(cx);
         self.redraw(cx);
         true
     }
@@ -588,9 +548,6 @@ impl RouterWidget {
             );
         }
         let ok = self.navigate_by_path_internal(cx, path, true);
-        if ok {
-            self.web_push_current_url(cx);
-        }
         ok
     }
 }

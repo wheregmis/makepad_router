@@ -1,4 +1,4 @@
-use makepad_router::{RouterWidgetRef, RouterWidgetWidgetRefExt};
+use makepad_router::{RouterCommand, RouterWidgetRef, RouterWidgetWidgetRefExt};
 use makepad_widgets::*;
 
 script_mod! {
@@ -69,6 +69,8 @@ script_mod! {
             pop_transition: @SharedAxis
             replace_transition: @Fade
             transition_duration: 0.25
+            cap_transitions: true
+            cap_nested: true
 
             admin_users := mod.widgets.RouterRoute{
                 route_pattern: "/dashboard"
@@ -110,7 +112,13 @@ impl AdminController {
         }
 
         if to_home {
-            router.navigate(cx, live_id!(home));
+            let _ = router.dispatch(
+                cx,
+                RouterCommand::GoToRoute {
+                    route_id: live_id!(home),
+                    transition: None,
+                },
+            );
         }
     }
 
@@ -126,10 +134,20 @@ impl AdminController {
                     return;
                 };
                 if to_settings {
-                    admin_router.navigate_by_path(cx, "/settings");
+                    let _ = admin_router.dispatch(
+                        cx,
+                        RouterCommand::GoToPath {
+                            path: "/settings".to_string(),
+                        },
+                    );
                 }
                 if to_user_42 {
-                    admin_router.navigate_by_path(cx, "/users/42");
+                    let _ = admin_router.dispatch(
+                        cx,
+                        RouterCommand::GoToPath {
+                            path: "/users/42".to_string(),
+                        },
+                    );
                 }
             }
             Some(id) if id == live_id!(admin_settings) => {
@@ -139,7 +157,12 @@ impl AdminController {
                     return;
                 };
                 if to_users {
-                    admin_router.navigate_by_path(cx, "/dashboard");
+                    let _ = admin_router.dispatch(
+                        cx,
+                        RouterCommand::GoToPath {
+                            path: "/dashboard".to_string(),
+                        },
+                    );
                 }
             }
             Some(id) if id == live_id!(admin_user_detail) => {
@@ -159,7 +182,7 @@ impl AdminController {
                     return;
                 };
                 if to_back {
-                    admin_router.back(cx);
+                    let _ = admin_router.dispatch(cx, RouterCommand::Back { transition: None });
                 }
             }
             _ => {}

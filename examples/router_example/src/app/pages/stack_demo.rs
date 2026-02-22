@@ -1,4 +1,4 @@
-use makepad_router::{Route, RouterWidgetRef};
+use makepad_router::{Route, RouterCommand, RouterWidgetRef};
 use makepad_widgets::*;
 
 script_mod! {
@@ -55,26 +55,45 @@ impl StackDemoController {
         };
 
         if set_stack {
-            router.set_stack(
+            let _ = router.dispatch(
                 cx,
-                vec![
-                    Route::new(live_id!(home)),
-                    Route::new(live_id!(settings)),
-                    Route::new(live_id!(about)),
-                ],
+                RouterCommand::SetStack {
+                    stack: vec![
+                        Route::new(live_id!(home)),
+                        Route::new(live_id!(settings)),
+                        Route::new(live_id!(about)),
+                    ],
+                },
             );
         }
         if pop_to_settings {
-            router.pop_to(cx, live_id!(settings));
+            let _ = router.dispatch(
+                cx,
+                RouterCommand::PopTo {
+                    route_id: live_id!(settings),
+                },
+            );
         }
         if pop_to_root {
-            router.pop_to_root(cx);
+            let _ = router.dispatch(cx, RouterCommand::PopToRoot);
         }
         if replace_about {
-            router.replace(cx, live_id!(about));
+            let _ = router.dispatch(
+                cx,
+                RouterCommand::ReplaceRoute {
+                    route_id: live_id!(about),
+                    transition: None,
+                },
+            );
         }
         if to_home {
-            router.navigate(cx, live_id!(home));
+            let _ = router.dispatch(
+                cx,
+                RouterCommand::GoToRoute {
+                    route_id: live_id!(home),
+                    transition: None,
+                },
+            );
         }
     }
 }

@@ -1,4 +1,4 @@
-use makepad_router::{RouterWidgetRef, RouterWidgetWidgetRefExt};
+use makepad_router::{RouterCommand, RouterWidgetRef, RouterWidgetWidgetRefExt};
 use makepad_widgets::*;
 
 script_mod! {
@@ -54,6 +54,7 @@ script_mod! {
             push_transition: @SlideLeft
             pop_transition: @SlideRight
             transition_duration: 0.20
+            cap_transitions: true
 
             settings_overview := mod.widgets.RouterRoute{
                 route_pattern: "/overview"
@@ -74,13 +75,14 @@ pub struct SettingsController;
 
 impl SettingsController {
     pub fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions, router: &RouterWidgetRef) {
-        let Some((to_home, to_overview, to_profile, settings_router)) =
-            router.with_active_route_widget(|w| {
+        let Some((to_home, to_overview, to_profile, settings_router)) = router
+            .with_active_route_widget(|w| {
                 (
                     w.button(cx, &[live_id!(home_btn)]).clicked(actions),
                     w.button(cx, &[live_id!(overview_btn)]).clicked(actions),
                     w.button(cx, &[live_id!(profile_btn)]).clicked(actions),
-                    w.widget(cx, &[live_id!(settings_router)]).as_router_widget(),
+                    w.widget(cx, &[live_id!(settings_router)])
+                        .as_router_widget(),
                 )
             })
         else {
@@ -89,15 +91,31 @@ impl SettingsController {
 
         if !settings_router.is_empty() {
             if to_overview {
-                settings_router.navigate_by_path(cx, "/overview");
+                let _ = settings_router.dispatch(
+                    cx,
+                    RouterCommand::GoToPath {
+                        path: "/overview".to_string(),
+                    },
+                );
             }
             if to_profile {
-                settings_router.navigate_by_path(cx, "/profile");
+                let _ = settings_router.dispatch(
+                    cx,
+                    RouterCommand::GoToPath {
+                        path: "/profile".to_string(),
+                    },
+                );
             }
         }
 
         if to_home {
-            router.navigate(cx, live_id!(home));
+            let _ = router.dispatch(
+                cx,
+                RouterCommand::GoToRoute {
+                    route_id: live_id!(home),
+                    transition: None,
+                },
+            );
         }
     }
 }

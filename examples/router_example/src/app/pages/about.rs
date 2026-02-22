@@ -1,4 +1,4 @@
-use makepad_router::RouterWidgetRef;
+use makepad_router::{RouterCommand, RouterWidgetRef};
 use makepad_widgets::*;
 
 script_mod! {
@@ -30,7 +30,13 @@ impl AboutController {
             return;
         };
         if to_home {
-            router.navigate(cx, live_id!(home));
+            let _ = router.dispatch(
+                cx,
+                RouterCommand::GoToRoute {
+                    route_id: live_id!(home),
+                    transition: None,
+                },
+            );
         }
     }
 }

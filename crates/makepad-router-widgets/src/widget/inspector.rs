@@ -93,8 +93,8 @@ impl RouterWidget {
         let pad = 8.0;
         let max_width = 280.0f64;
         let width = max_width.min((rect.size.x - margin * 2.0).max(0.0));
-        let height = (lines.len() as f64 * line_h + pad * 2.0)
-            .min((rect.size.y - margin * 2.0).max(0.0));
+        let height =
+            (lines.len() as f64 * line_h + pad * 2.0).min((rect.size.y - margin * 2.0).max(0.0));
 
         if width <= 0.0 || height <= 0.0 {
             self.draw_lists.inspector.end(cx);
@@ -111,7 +111,8 @@ impl RouterWidget {
 
         let mut y = pos.y + pad;
         for line in lines {
-            self.inspector_text.draw_abs(cx, dvec2(pos.x + pad, y), &line);
+            self.inspector_text
+                .draw_abs(cx, dvec2(pos.x + pad, y), &line);
             y += line_h;
             if y > pos.y + height - 4.0 {
                 break;

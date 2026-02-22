@@ -21,7 +21,7 @@ impl RouterWidget {
         if clear_extras {
             self.clear_url_extras();
         } else {
-            self.web.url_path_override = None;
+            self.url_path_override = None;
         }
 
         // 1) Full match in this router.
@@ -101,11 +101,12 @@ impl RouterWidget {
         }
 
         // 3) Not-found fallback.
-        if self.not_found_route.0 != 0 && self.routes.templates.contains_key(&self.not_found_route) {
+        if self.not_found_route.0 != 0 && self.routes.templates.contains_key(&self.not_found_route)
+        {
             // Push not-found so the user can navigate back to the previous page.
             // Preserve the attempted path in the address bar.
             if self.current_route_id() != Some(self.not_found_route) {
-                self.web.url_path_override = Some(path);
+                self.url_path_override = Some(path);
                 let old_route = self.router.current_route().cloned();
                 let mut nf = Route::new(self.not_found_route);
                 nf.query = query;
@@ -153,7 +154,7 @@ impl RouterWidget {
         if clear_extras {
             self.clear_url_extras();
         } else {
-            self.web.url_path_override = None;
+            self.url_path_override = None;
         }
 
         if let Some(mut route) = self.router.route_registry.resolve_path(&path) {
@@ -228,8 +229,9 @@ impl RouterWidget {
             }
         }
 
-        if self.not_found_route.0 != 0 && self.routes.templates.contains_key(&self.not_found_route) {
-            self.web.url_path_override = Some(path);
+        if self.not_found_route.0 != 0 && self.routes.templates.contains_key(&self.not_found_route)
+        {
+            self.url_path_override = Some(path);
             let old_route = self.router.current_route().cloned();
             let mut nf = Route::new(self.not_found_route);
             nf.query = query;

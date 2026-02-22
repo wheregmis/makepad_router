@@ -1,9 +1,14 @@
-use crate::{pattern::{RouteParams, RoutePatternRef}, url::RouterUrl};
+use crate::{
+    pattern::{RouteParams, RoutePatternRef},
+    url::RouterUrl,
+};
 use makepad_widgets::*;
 
 use super::RouterTransitionState;
+use crate::guards::{
+    RouterAsyncGuard, RouterBeforeLeaveAsync, RouterBeforeLeaveSync, RouterSyncGuard,
+};
 use crate::route::Route;
-use crate::guards::{RouterAsyncGuard, RouterBeforeLeaveAsync, RouterBeforeLeaveSync, RouterSyncGuard};
 
 type RouteChangeCallback = Box<dyn Fn(&mut Cx, Option<Route>, Route) + Send + Sync>;
 
@@ -18,19 +23,6 @@ pub(crate) struct RouterGuards {
     pub(crate) route_guards_async: Vec<RouterAsyncGuard>,
     pub(crate) before_leave_hooks: Vec<RouterBeforeLeaveSync>,
     pub(crate) before_leave_hooks_async: Vec<RouterBeforeLeaveAsync>,
-}
-
-#[derive(Default)]
-pub(crate) struct WebUrlState {
-    pub(crate) url_path_override: Option<String>,
-    pub(crate) history_index: i32,
-    pub(crate) history_initialized: bool,
-    pub(crate) suppress_browser_update: bool,
-    pub(crate) ignore_next_browser_url_change: bool,
-    pub(crate) last_synced_url: Option<String>,
-    pub(crate) last_depth: usize,
-    pub(crate) last_child_depth: Option<usize>,
-    pub(crate) last_child_parent_route: LiveId,
 }
 
 #[derive(Default)]
@@ -60,9 +52,6 @@ pub(crate) struct PointerCleanup {
 pub(crate) struct RouterDrawLists {
     pub(crate) from: DrawList2d,
     pub(crate) to: DrawList2d,
-    pub(crate) hero_capture: DrawList2d,
-    pub(crate) hero_from: DrawList2d,
-    pub(crate) hero_to: DrawList2d,
     pub(crate) inspector: DrawList2d,
 }
 
@@ -71,9 +60,6 @@ impl RouterDrawLists {
         Self {
             from: DrawList2d::new(cx),
             to: DrawList2d::new(cx),
-            hero_capture: DrawList2d::new(cx),
-            hero_from: DrawList2d::new(cx),
-            hero_to: DrawList2d::new(cx),
             inspector: DrawList2d::new(cx),
         }
     }

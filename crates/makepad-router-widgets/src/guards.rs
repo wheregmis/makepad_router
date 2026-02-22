@@ -11,8 +11,6 @@ pub enum RouterNavKind {
     Replace,
     NavigateByPath,
     ReplaceByPath,
-    NavigateByUrl,
-    ReplaceByUrl,
     Back,
     Forward,
     Reset,
@@ -21,7 +19,6 @@ pub enum RouterNavKind {
     Pop,
     PopTo,
     PopToRoot,
-    BrowserUrlChanged,
 }
 
 /// Context passed to route guards and before-leave hooks.
@@ -31,7 +28,6 @@ pub struct RouterNavContext {
     pub from: Option<Route>,
     pub to: Option<Route>,
     pub to_path: Option<String>,
-    pub to_url: Option<String>,
 }
 
 /// Target used by a guard to redirect navigation.
@@ -39,7 +35,6 @@ pub struct RouterNavContext {
 pub enum RouterRedirectTarget {
     Route(LiveId),
     Path(String),
-    Url(String),
 }
 
 /// Redirect instruction returned by a guard.
@@ -74,13 +69,16 @@ pub enum RouterAsyncDecision<T> {
 pub type RouterSyncGuard =
     Box<dyn Fn(&mut Cx, &RouterNavContext) -> RouterGuardDecision + Send + Sync>;
 /// Async guard hook. Return an immediate decision or a `ToUIReceiver`.
-pub type RouterAsyncGuard =
-    Box<dyn Fn(&mut Cx, &RouterNavContext) -> RouterAsyncDecision<RouterGuardDecision> + Send + Sync>;
+pub type RouterAsyncGuard = Box<
+    dyn Fn(&mut Cx, &RouterNavContext) -> RouterAsyncDecision<RouterGuardDecision> + Send + Sync,
+>;
 
 /// Sync before-leave hook.
 pub type RouterBeforeLeaveSync =
     Box<dyn Fn(&mut Cx, &RouterNavContext) -> RouterBeforeLeaveDecision + Send + Sync>;
 /// Async before-leave hook.
 pub type RouterBeforeLeaveAsync = Box<
-    dyn Fn(&mut Cx, &RouterNavContext) -> RouterAsyncDecision<RouterBeforeLeaveDecision> + Send + Sync,
+    dyn Fn(&mut Cx, &RouterNavContext) -> RouterAsyncDecision<RouterBeforeLeaveDecision>
+        + Send
+        + Sync,
 >;

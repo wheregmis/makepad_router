@@ -110,7 +110,11 @@ impl Router {
     }
 
     /// Register a pattern-based route for `navigate_by_path`.
-    pub fn register_route_pattern(&mut self, pattern: &str, route_id: LiveId) -> Result<(), String> {
+    pub fn register_route_pattern(
+        &mut self,
+        pattern: &str,
+        route_id: LiveId,
+    ) -> Result<(), String> {
         self.route_registry.register_pattern(pattern, route_id)
     }
 
@@ -149,7 +153,6 @@ impl Router {
     pub fn set_stack(&mut self, stack: Vec<Route>) {
         self.history.set_stack(stack);
     }
-
 }
 
 /// Router actions for event handling
@@ -211,11 +214,16 @@ mod tests {
     #[test]
     fn test_router_navigate_by_path() {
         let mut router = Router::new(Route::new(live_id!(home)));
-        router.register_route_pattern("/user/:id", live_id!(user_profile)).unwrap();
-        
+        router
+            .register_route_pattern("/user/:id", live_id!(user_profile))
+            .unwrap();
+
         router.navigate_by_path("/user/123").unwrap();
         let route = router.current_route().unwrap();
         assert_eq!(route.id, live_id!(user_profile));
-        assert_eq!(route.get_param(LiveId::from_str("id")), Some(LiveId::from_str("123")));
+        assert_eq!(
+            route.get_param(LiveId::from_str("id")),
+            Some(LiveId::from_str("123"))
+        );
     }
 }

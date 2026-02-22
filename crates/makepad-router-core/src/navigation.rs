@@ -188,11 +188,7 @@ impl NavigationHistory {
         if current == Some(route_id) {
             return false;
         }
-        let Some(pos) = self
-            .index
-            .get(&route_id)
-            .and_then(|v| v.last().copied())
-        else {
+        let Some(pos) = self.index.get(&route_id).and_then(|v| v.last().copied()) else {
             return false;
         };
         self.stack.truncate(pos + 1);
@@ -398,7 +394,10 @@ mod tests {
     #[test]
     fn test_stack_set_stack() {
         let mut history = NavigationHistory::empty();
-        history.set_stack(vec![Route::new(live_id!(home)), Route::new(live_id!(settings))]);
+        history.set_stack(vec![
+            Route::new(live_id!(home)),
+            Route::new(live_id!(settings)),
+        ]);
         assert_eq!(history.current().unwrap().id, live_id!(settings));
         assert_eq!(history.depth(), 2);
         assert!(!history.can_go_forward());

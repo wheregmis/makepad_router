@@ -1,7 +1,7 @@
 use makepad_router_core::makepad_live_id::*;
 use makepad_router_core::makepad_micro_serde::{DeRon, SerRon};
 use makepad_router_core::{
-    NavigationHistory, Route, RouteParams, RoutePattern, RouteQuery, RouterState,
+    NavigationHistory, Route, RouteParams, RoutePattern, RoutePatternRef, RouteQuery, RouterState,
 };
 
 #[test]
@@ -18,7 +18,9 @@ fn router_state_ron_roundtrip_preserves_history_and_query() {
         params,
         query,
         hash: "#section".to_string(),
-        pattern: Some(RoutePattern::parse("/user/:id").unwrap()),
+        pattern: Some(RoutePatternRef::new(
+            RoutePattern::parse("/user/:id").unwrap(),
+        )),
     };
 
     let history = NavigationHistory::from_parts(vec![Route::new(live_id!(home)), route], 1);
